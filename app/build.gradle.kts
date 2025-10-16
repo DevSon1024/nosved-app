@@ -16,7 +16,9 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
-
+        ndk {
+            abiFilters.addAll(listOf("x86", "x86_64", "armeabi-v7a", "arm64-v8a"))
+        }
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -40,9 +42,12 @@ android {
         compose = true
     }
 }
+val youtubedlAndroid = "0.18.0"
 
 dependencies {
-    implementation("com.github.yausername:youtubedl-android:0.18.0")
+    implementation("io.github.junkfood02.youtubedl-android:library:${youtubedlAndroid}")
+    implementation("io.github.junkfood02.youtubedl-android:ffmpeg:${youtubedlAndroid}")
+    implementation("io.github.junkfood02.youtubedl-android:aria2c:${youtubedlAndroid}")
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.7.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
     implementation("androidx.activity:activity-compose:1.9.0")
