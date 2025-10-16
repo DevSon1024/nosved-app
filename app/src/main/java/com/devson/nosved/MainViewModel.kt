@@ -6,7 +6,9 @@ import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.yausername.youtubedl_android.YoutubeDL
+import com.yausername.youtubedl_android.YoutubeDLException
 import com.yausername.youtubedl_android.YoutubeDLRequest
+import com.yausername.youtubedl_android.mapper.VideoFormat
 import com.yausername.youtubedl_android.mapper.VideoInfo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,6 +24,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _isLoading = MutableStateFlow(false)
     val isLoading = _isLoading.asStateFlow()
+
+    private val _showQualityDialog = MutableStateFlow(false)
+    val showQualityDialog = _showQualityDialog.asStateFlow()
 
     private val notificationHelper = NotificationHelper(application)
 
@@ -41,27 +46,49 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
             _isLoading.value = false
+            if (_videoInfo.value != null) {
+                _showQualityDialog.value = true
+            }
         }
     }
 
-    fun downloadVideo(url: String) {
+    fun showQualityDialog() {
+        _showQualityDialog.value = true
+    }
+
+    fun hideQualityDialog() {
+        _showQualityDialog.value = false
+    }
+
+    fun downloadVideo(videoInfo: VideoInfo, format: VideoFormat) {
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
-                val youtubeDLDir = File(
-                    Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
-                    "Nosved"
-                )
-                val request = YoutubeDLRequest(url)
-                request.addOption("-o", youtubeDLDir.absolutePath + "/%(title)s.%(ext)s")
-
-                YoutubeDL.getInstance().execute(request) { progress, _, line ->
-                    Log.d("NosvedApp", "Download progress: $progress%, line: $line")
-                    val progressPercent = progress.toInt()
-                    notificationHelper.showDownloadProgressNotification(progressPercent)
+                val downloadDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                val nosvedDir = File(downloadDir, "nosved")
+                if (!nosvedDir.exists()) {
+                    nosvedDir.mkdirs()
                 }
 
-                notificationHelper.cancelNotification()
-                // You can add a "Download Complete" notification here
+                val request = videoInfo.webpageUrl?.let { YoutubeDLRequest(it) }
+                request?.addOption("-o", nosvedDir.absolutePath + "/%(title)s.%(ext)s")
+                // Use the selected format's ID
+                request?.addOption("-f", format.formatId.toString())
+
+                try {
+                    if (request != null) {
+                        YoutubeDL.getInstance().execute(request) { _, _, line ->
+                            Log.d("NosvedApp", "Download progress line: $line")
+                            notificationHelper.showDownloadProgressNotification(line)
+                        }
+                    }
+                } catch (e: YoutubeDLException) {
+                    Log.e("NosvedApp", "Failed to download video", e)
+                }
+
+                notificationHelper.showDownloadCompleteNotification(
+                    videoInfo.title.toString(),
+                    nosvedDir.absolutePath
+                )
             }
         }
     }
