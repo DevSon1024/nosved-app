@@ -10,15 +10,14 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
@@ -78,24 +77,19 @@ fun DownloadScreen(viewModel: MainViewModel) {
     var url by remember { mutableStateOf("") }
     val videoInfo by viewModel.videoInfo.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
-    val showQualityDialog by viewModel.showQualityDialog.collectAsState()
+    val selectedVideoFormat by viewModel.selectedVideoFormat.collectAsState()
+    val selectedAudioFormat by viewModel.selectedAudioFormat.collectAsState()
 
-    if (showQualityDialog && videoInfo != null) {
-        QualitySelectionDialog(
-            videoInfo = videoInfo!!,
-            onDismiss = { viewModel.hideQualityDialog() },
-            onDownload = { format ->
-                viewModel.downloadVideo(videoInfo!!, format)
-                viewModel.hideQualityDialog()
-            }
-        )
-    }
 
-    Column(modifier = Modifier.padding(16.dp)) {
+    Column(
+        modifier = Modifier
+            .padding(16.dp)
+            .fillMaxWidth()
+    ) {
         OutlinedTextField(
             value = url,
             onValueChange = { url = it },
-            label = { Text("Video URL") },
+            label = { Text("Enter URL") },
             modifier = Modifier.fillMaxWidth(),
             trailingIcon = {
                 if (url.isNotEmpty()) {
@@ -105,99 +99,158 @@ fun DownloadScreen(viewModel: MainViewModel) {
                 }
             }
         )
+        Spacer(modifier = Modifier.height(8.dp))
         Button(
             onClick = { viewModel.fetchVideoInfo(url) },
-            modifier = Modifier.padding(top = 8.dp),
-            enabled = !isLoading
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !isLoading && url.isNotBlank()
         ) {
-            Text("Fetch Info")
+            Text("Search Video")
         }
 
         if (isLoading) {
-            CircularProgressIndicator(modifier = Modifier.padding(top = 16.dp))
+            Spacer(modifier = Modifier.height(16.dp))
+            CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
         }
 
         videoInfo?.let {
-            VideoCard(videoInfo = it, onDownloadClicked = { viewModel.showQualityDialog() })
+            Spacer(modifier = Modifier.height(16.dp))
+            VideoInfoCard(
+                videoInfo = it,
+                selectedVideoFormat = selectedVideoFormat,
+                selectedAudioFormat = selectedAudioFormat,
+                onVideoFormatSelected = { format -> viewModel.selectVideoFormat(format) },
+                onAudioFormatSelected = { format -> viewModel.selectAudioFormat(format) },
+                onDownloadClicked = { vFormat, aFormat ->
+                    viewModel.downloadVideo(it, vFormat, aFormat)
+                }
+            )
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun VideoCard(
+fun VideoInfoCard(
     videoInfo: VideoInfo,
-    onDownloadClicked: () -> Unit
+    selectedVideoFormat: VideoFormat?,
+    selectedAudioFormat: VideoFormat?,
+    onVideoFormatSelected: (VideoFormat) -> Unit,
+    onAudioFormatSelected: (VideoFormat) -> Unit,
+    onDownloadClicked: (VideoFormat, VideoFormat) -> Unit
 ) {
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 16.dp),
+        modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
-        Row(modifier = Modifier.padding(8.dp)) {
-            AsyncImage(
-                model = videoInfo.thumbnail,
-                contentDescription = "Video Thumbnail",
-                modifier = Modifier.size(120.dp)
-            )
-            Column(modifier = Modifier.padding(start = 8.dp)) {
-                Text(videoInfo.title.toString(), style = MaterialTheme.typography.titleMedium)
-                Text("Uploader: ${videoInfo.uploader}", style = MaterialTheme.typography.bodyMedium)
-                Text("Duration: ${videoInfo.duration}", style = MaterialTheme.typography.bodyMedium)
-                Button(onClick = onDownloadClicked, modifier = Modifier.padding(top = 8.dp)) {
-                    Text("Download Again")
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                AsyncImage(
+                    model = videoInfo.thumbnail,
+                    contentDescription = "Video Thumbnail",
+                    modifier = Modifier.size(100.dp)
+                )
+                Spacer(modifier = Modifier.width(16.dp))
+                Column {
+                    Text(videoInfo.title.toString(), style = MaterialTheme.typography.titleLarge)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        "Uploader: ${videoInfo.uploader}",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        "Duration: ${videoInfo.duration}",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
                 }
             }
-        }
-    }
-}
 
-@Composable
-fun QualitySelectionDialog(
-    videoInfo: VideoInfo,
-    onDismiss: () -> Unit,
-    onDownload: (VideoFormat) -> Unit
-) {
-    var selectedFormat by remember { mutableStateOf<VideoFormat?>(null) }
+            Spacer(modifier = Modifier.height(16.dp))
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Select Quality") },
-        text = {
-            LazyColumn {
-                items(videoInfo.formats.orEmpty()) { format ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { selectedFormat = format }
-                            .padding(8.dp)
-                    ) {
-                        RadioButton(
-                            selected = selectedFormat == format,
-                            onClick = { selectedFormat = format }
-                        )
-                        Column(modifier = Modifier.padding(start = 8.dp)) {
-                            Text("${format.formatNote} (${format.ext})")
-                            Text(format.getFormattedFileSize(), style = MaterialTheme.typography.bodySmall)
-                        }
-                    }
-                }
+            val videoFormats =
+                videoInfo.formats?.filter { it.vcodec != "none" && it.acodec == "none" }
+                    ?: emptyList()
+            val audioFormats =
+                videoInfo.formats?.filter { it.acodec != "none" && it.vcodec == "none" }
+                    ?: emptyList()
+
+            Row(Modifier.fillMaxWidth()) {
+                QualityDropdown(
+                    modifier = Modifier.weight(1f),
+                    label = "Video Quality",
+                    items = videoFormats,
+                    selectedItem = selectedVideoFormat,
+                    onItemSelected = onVideoFormatSelected,
+                    itemLabel = { "${it.height}p${it.fps ?: ""} (${it.getFormattedFileSize()})" }
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                QualityDropdown(
+                    modifier = Modifier.weight(1f),
+                    label = "Audio Quality",
+                    items = audioFormats,
+                    selectedItem = selectedAudioFormat,
+                    onItemSelected = onAudioFormatSelected,
+                    itemLabel = { "${it.abr}kbps (${it.getFormattedFileSize()})" }
+                )
             }
-        },
-        confirmButton = {
+
+
+            Spacer(modifier = Modifier.height(16.dp))
+
             Button(
                 onClick = {
-                    selectedFormat?.let { onDownload(it) }
+                    if (selectedVideoFormat != null && selectedAudioFormat != null) {
+                        onDownloadClicked(selectedVideoFormat, selectedAudioFormat)
+                    }
                 },
-                enabled = selectedFormat != null
+                modifier = Modifier.fillMaxWidth(),
+                enabled = selectedVideoFormat != null && selectedAudioFormat != null
             ) {
                 Text("Download")
             }
-        },
-        dismissButton = {
-            Button(onClick = onDismiss) {
-                Text("Cancel")
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun <T> QualityDropdown(
+    modifier: Modifier = Modifier,
+    label: String,
+    items: List<T>,
+    selectedItem: T?,
+    onItemSelected: (T) -> Unit,
+    itemLabel: (T) -> String
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = !expanded },
+        modifier = modifier
+    ) {
+        OutlinedTextField(
+            value = if (selectedItem != null) itemLabel(selectedItem) else "",
+            onValueChange = {},
+            readOnly = true,
+            label = { Text(label) },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            modifier = Modifier.menuAnchor()
+        )
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            items.forEach { item ->
+                DropdownMenuItem(
+                    text = { Text(itemLabel(item), style = MaterialTheme.typography.bodyMedium) },
+                    onClick = {
+                        onItemSelected(item)
+                        expanded = false
+                    }
+                )
             }
         }
-    )
+    }
 }

@@ -25,8 +25,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _isLoading = MutableStateFlow(false)
     val isLoading = _isLoading.asStateFlow()
 
-    private val _showQualityDialog = MutableStateFlow(false)
-    val showQualityDialog = _showQualityDialog.asStateFlow()
+    private val _selectedVideoFormat = MutableStateFlow<VideoFormat?>(null)
+    val selectedVideoFormat = _selectedVideoFormat.asStateFlow()
+
+    private val _selectedAudioFormat = MutableStateFlow<VideoFormat?>(null)
+    val selectedAudioFormat = _selectedAudioFormat.asStateFlow()
 
     private val notificationHelper = NotificationHelper(application)
 
@@ -37,6 +40,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun fetchVideoInfo(url: String) {
         viewModelScope.launch {
             _isLoading.value = true
+            _videoInfo.value = null // Clear previous info
+            _selectedVideoFormat.value = null
+            _selectedAudioFormat.value = null
             _videoInfo.value = withContext(Dispatchers.IO) {
                 try {
                     YoutubeDL.getInstance().getInfo(url)
@@ -45,22 +51,27 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     null
                 }
             }
-            _isLoading.value = false
-            if (_videoInfo.value != null) {
-                _showQualityDialog.value = true
+            // Set default audio format (best quality)
+            _videoInfo.value?.let { info ->
+                val bestAudioFormat = info.formats
+                    ?.filter { it.acodec != "none" && it.vcodec == "none" }
+                    ?.maxByOrNull { it.abr ?: 0 }
+                _selectedAudioFormat.value = bestAudioFormat
             }
+            _isLoading.value = false
         }
     }
 
-    fun showQualityDialog() {
-        _showQualityDialog.value = true
+    fun selectVideoFormat(format: VideoFormat) {
+        _selectedVideoFormat.value = format
     }
 
-    fun hideQualityDialog() {
-        _showQualityDialog.value = false
+    fun selectAudioFormat(format: VideoFormat) {
+        _selectedAudioFormat.value = format
     }
 
-    fun downloadVideo(videoInfo: VideoInfo, format: VideoFormat) {
+
+    fun downloadVideo(videoInfo: VideoInfo, videoFormat: VideoFormat, audioFormat: VideoFormat) {
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
                 val downloadDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
@@ -71,8 +82,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
                 val request = videoInfo.webpageUrl?.let { YoutubeDLRequest(it) }
                 request?.addOption("-o", nosvedDir.absolutePath + "/%(title)s.%(ext)s")
-                // Use the selected format's ID
-                request?.addOption("-f", format.formatId.toString())
+                // Combine selected video and audio formats
+                request?.addOption("-f", "${videoFormat.formatId}+${audioFormat.formatId}")
+                request?.addOption("--merge-output-format", "mp4")
+
 
                 try {
                     if (request != null) {

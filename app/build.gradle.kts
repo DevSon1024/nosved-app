@@ -6,9 +6,7 @@ plugins {
 
 android {
     namespace = "com.devson.nosved"
-    compileSdk {
-        version = release(36)
-    }
+    compileSdk = 36 // Assuming release 36 is correct; adjust if necessary
 
     defaultConfig {
         applicationId = "com.devson.nosved"
@@ -16,21 +14,63 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
-        ndk {
-            abiFilters.addAll(listOf("x86", "x86_64", "armeabi-v7a", "arm64-v8a"))
-        }
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        vectorDrawables {
+            useSupportLibrary = true
+        }
+    }
+
+    signingConfigs {
+        create("release") {
+            // This is a placeholder for your signing configuration.
+            // You can either configure it here or let Android Studio handle it during the build process.
+        }
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // Enable code shrinking, obfuscation, and optimization.
+            isMinifyEnabled = true
+
+            // Enable resource shrinking.
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = signingConfigs.getByName("release")
         }
     }
+
+    // This block enables the ABI splits, similar to the "Seal" project
+    flavorDimensions += "abi"
+    productFlavors {
+        create("arm64-v8a") {
+            dimension = "abi"
+            ndk {
+                abiFilters += "arm64-v8a"
+            }
+        }
+        create("armeabi-v7a") {
+            dimension = "abi"
+            ndk {
+                abiFilters += "armeabi-v7a"
+            }
+        }
+        create("x86_64") {
+            dimension = "abi"
+            ndk {
+                abiFilters += "x86_64"
+            }
+        }
+        create("x86") {
+            dimension = "abi"
+            ndk {
+                abiFilters += "x86"
+            }
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -41,14 +81,26 @@ android {
     buildFeatures {
         compose = true
     }
-    ndkVersion = "27.0.12077973"
+    composeOptions {
+        kotlinCompilerExtensionVersion = "1.5.1" // Example version, adjust if needed
+    }
+    packaging {
+        resources {
+            // youtube-dl has a built-in downloader as a fallback.
+            jniLibs {
+                excludes += "**/libaria2c.so"
+            }
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
+    }
 }
+
 val youtubedlAndroid = "0.18.0"
 
 dependencies {
     implementation("io.github.junkfood02.youtubedl-android:library:${youtubedlAndroid}")
     implementation("io.github.junkfood02.youtubedl-android:ffmpeg:${youtubedlAndroid}")
-    implementation("io.github.junkfood02.youtubedl-android:aria2c:${youtubedlAndroid}")
+//    implementation("io.github.junkfood02.youtubedl-android:aria2c:${youtubedlAndroid}")
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.7.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
     implementation("androidx.activity:activity-compose:1.9.0")
