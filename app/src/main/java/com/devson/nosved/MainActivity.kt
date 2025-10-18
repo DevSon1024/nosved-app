@@ -11,13 +11,17 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.navigation.compose.NavHost
@@ -242,7 +246,7 @@ fun MainContent(viewModel: MainViewModel) {
 
 @Composable
 fun DownloadScreen(viewModel: MainViewModel) {
-    var url by remember { mutableStateOf("") }
+    val currentUrl by viewModel.currentUrl.collectAsState()
     val videoInfo by viewModel.videoInfo.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val selectedVideoFormat by viewModel.selectedVideoFormat.collectAsState()
@@ -253,30 +257,50 @@ fun DownloadScreen(viewModel: MainViewModel) {
             .padding(16.dp)
             .fillMaxWidth()
     ) {
-        OutlinedTextField(
-            value = url,
-            onValueChange = { url = it },
-            label = { Text("Enter URL") },
-            placeholder = { Text("Paste video URL here...") },
+        // URL Input Section with Paste Button
+        Row(
             modifier = Modifier.fillMaxWidth(),
-            leadingIcon = {
-                Icon(Icons.Default.Link, contentDescription = null)
-            },
-            trailingIcon = {
-                if (url.isNotEmpty()) {
-                    IconButton(onClick = { url = "" }) {
-                        Icon(Icons.Default.Clear, contentDescription = "Clear")
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            OutlinedTextField(
+                value = currentUrl,
+                onValueChange = { viewModel.updateUrl(it) },
+                label = { Text("Enter URL") },
+                placeholder = { Text("Paste video URL here...") },
+                modifier = Modifier.weight(1f),
+                leadingIcon = {
+                    Icon(Icons.Default.Link, contentDescription = null)
+                },
+                trailingIcon = {
+                    if (currentUrl.isNotEmpty()) {
+                        IconButton(onClick = { viewModel.clearUrl() }) {
+                            Icon(Icons.Default.Clear, contentDescription = "Clear")
+                        }
                     }
                 }
+            )
+
+            // Paste Button
+            OutlinedButton(
+                onClick = { viewModel.pasteFromClipboard() },
+                modifier = Modifier.height(56.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.ContentPaste,
+                    contentDescription = "Paste",
+                    modifier = Modifier.size(20.dp)
+                )
             }
-        )
+        }
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
+        // Search Button
         Button(
-            onClick = { viewModel.fetchVideoInfo(url) },
+            onClick = { viewModel.fetchVideoInfo(currentUrl) },
             modifier = Modifier.fillMaxWidth(),
-            enabled = !isLoading && url.isNotBlank()
+            enabled = !isLoading && currentUrl.isNotBlank()
         ) {
             if (isLoading) {
                 CircularProgressIndicator(
@@ -292,6 +316,7 @@ fun DownloadScreen(viewModel: MainViewModel) {
             }
         }
 
+        // Loading State
         if (isLoading) {
             Spacer(modifier = Modifier.height(32.dp))
             Column(
@@ -308,6 +333,7 @@ fun DownloadScreen(viewModel: MainViewModel) {
             }
         }
 
+        // Video Info Card with Full-size Thumbnail
         videoInfo?.let {
             Spacer(modifier = Modifier.height(16.dp))
             VideoInfoCard(
@@ -339,35 +365,52 @@ fun VideoInfoCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                AsyncImage(
-                    model = videoInfo.thumbnail,
-                    contentDescription = "Video Thumbnail",
-                    modifier = Modifier.size(100.dp)
+            // Full-size Thumbnail at the top
+            AsyncImage(
+                model = videoInfo.thumbnail,
+                contentDescription = "Video Thumbnail",
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(200.dp)
+                    .clip(RoundedCornerShape(8.dp)),
+                contentScale = ContentScale.Crop
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Video Information
+            Column {
+                Text(
+                    text = videoInfo.title ?: "Unknown Title",
+                    style = MaterialTheme.typography.titleLarge,
+                    textAlign = TextAlign.Start
                 )
 
-                Spacer(modifier = Modifier.width(16.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
-                Column {
-                    Text(
-                        text = videoInfo.title ?: "Unknown Title",
-                        style = MaterialTheme.typography.titleLarge
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Uploader: ${videoInfo.uploader ?: "Unknown"}",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Duration: ${videoInfo.duration ?: "Unknown"}",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Uploader: ${videoInfo.uploader ?: "Unknown"}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Duration: ${formatDuration(videoInfo.duration)}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            // Quality Selection
             val videoFormats = videoInfo.formats
                 ?.filter { it.vcodec != "none" && it.acodec == "none" }
                 ?: emptyList()
@@ -403,6 +446,7 @@ fun VideoInfoCard(
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            // Download Button
             Button(
                 onClick = {
                     if (selectedVideoFormat != null && selectedAudioFormat != null) {
@@ -414,7 +458,7 @@ fun VideoInfoCard(
             ) {
                 Icon(Icons.Default.Download, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Download")
+                Text("Download Video")
             }
         }
     }
@@ -467,5 +511,19 @@ fun <T> QualityDropdown(
                 )
             }
         }
+    }
+}
+
+// Helper function to format duration
+private fun formatDuration(duration: Int?): String {
+    if (duration == null) return "Unknown"
+
+    val hours = duration / 3600
+    val minutes = (duration % 3600) / 60
+    val seconds = duration % 60
+
+    return when {
+        hours > 0 -> String.format("%d:%02d:%02d", hours, minutes, seconds)
+        else -> String.format("%d:%02d", minutes, seconds)
     }
 }

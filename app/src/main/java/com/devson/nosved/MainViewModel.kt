@@ -1,8 +1,11 @@
 package com.devson.nosved
 
 import android.app.Application
+import android.content.ClipboardManager
+import android.content.Context
 import android.os.Environment
 import android.util.Log
+import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.devson.nosved.data.*
@@ -23,6 +26,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val database = DownloadDatabase.getDatabase(application)
     private val downloadDao = database.downloadDao()
+    private val context = application.applicationContext
 
     private val _videoInfo = MutableStateFlow<VideoInfo?>(null)
     val videoInfo = _videoInfo.asStateFlow()
@@ -39,6 +43,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _downloadProgress = MutableStateFlow<Map<String, DownloadProgress>>(emptyMap())
     val downloadProgress = _downloadProgress.asStateFlow()
 
+    // New state for URL management
+    private val _currentUrl = MutableStateFlow("")
+    val currentUrl = _currentUrl.asStateFlow()
+
     private val notificationHelper = NotificationHelper(application)
 
     // Download flows from database
@@ -49,6 +57,36 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         notificationHelper.createNotificationChannel()
+    }
+
+    fun updateUrl(url: String) {
+        _currentUrl.value = url
+    }
+
+    fun pasteFromClipboard(): String {
+        return try {
+            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            val clipData = clipboard.primaryClip
+            if (clipData != null && clipData.itemCount > 0) {
+                val pastedText = clipData.getItemAt(0).text?.toString() ?: ""
+                _currentUrl.value = pastedText
+                showToast("URL pasted from clipboard")
+                pastedText
+            } else {
+                showToast("Clipboard is empty")
+                ""
+            }
+        } catch (e: Exception) {
+            showToast("Failed to paste from clipboard")
+            ""
+        }
+    }
+
+    fun clearUrl() {
+        _currentUrl.value = ""
+        _videoInfo.value = null
+        _selectedVideoFormat.value = null
+        _selectedAudioFormat.value = null
     }
 
     fun fetchVideoInfo(url: String) {
@@ -63,6 +101,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     YoutubeDL.getInstance().getInfo(url)
                 } catch (e: Exception) {
                     Log.e("NosvedApp", "Failed to fetch video info", e)
+                    showToast("Failed to fetch video information")
                     null
                 }
             }
@@ -106,6 +145,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             )
 
             downloadDao.insertDownload(downloadEntity)
+
+            // Show toast for download started
+            showToast("Download started: ${videoInfo.title}")
+
             startDownload(downloadId, videoInfo, videoFormat, audioFormat)
         }
     }
@@ -166,6 +209,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         ) ?: return@withContext
                     )
 
+                    // Show success toast
+                    showToast("Download completed: ${videoInfo.title}")
+
                     notificationHelper.showDownloadCompleteNotification(
                         videoInfo.title ?: "Unknown Title",
                         filePath.absolutePath
@@ -174,6 +220,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
             } catch (e: YoutubeDLException) {
                 Log.e("NosvedApp", "Failed to download video", e)
+
+                // Show failure toast
+                showToast("Download failed: ${videoInfo.title}")
+
                 downloadDao.updateDownload(
                     downloadDao.getDownloadById(downloadId)?.copy(
                         status = DownloadStatus.FAILED,
@@ -186,8 +236,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun cancelDownload(downloadId: String) {
         viewModelScope.launch {
+            val download = downloadDao.getDownloadById(downloadId)
             downloadDao.updateDownloadStatus(downloadId, DownloadStatus.CANCELLED)
             _downloadProgress.value = _downloadProgress.value - downloadId
+
+            download?.let {
+                showToast("Download cancelled: ${it.title}")
+            }
         }
     }
 
@@ -196,6 +251,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val download = downloadDao.getDownloadById(downloadId)
             if (download != null && download.status == DownloadStatus.FAILED) {
                 downloadDao.updateDownloadStatus(downloadId, DownloadStatus.QUEUED)
+                showToast("Retrying download: ${download.title}")
                 // Re-fetch video info and restart download
                 // This is a simplified version - you might want to store format info
             }
@@ -214,12 +270,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 }
                 downloadDao.deleteDownloadById(downloadId)
+                showToast("Download deleted: ${it.title}")
             }
         }
     }
 
-    // Removed clearCompletedDownloads() function as requested
-    // This function is no longer available since we're treating downloads as history
+    private fun showToast(message: String) {
+        viewModelScope.launch(Dispatchers.Main) {
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+        }
+    }
 
     private fun extractSpeed(line: String): String {
         val speedRegex = "([0-9.]+[KMG]iB/s)".toRegex()
