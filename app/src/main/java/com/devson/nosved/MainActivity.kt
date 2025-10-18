@@ -11,6 +11,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -254,8 +255,8 @@ fun DownloadScreen(viewModel: MainViewModel) {
 
     Column(
         modifier = Modifier
+            .fillMaxSize()
             .padding(16.dp)
-            .fillMaxWidth()
     ) {
         // URL Input Section with Paste Button
         Row(
@@ -333,19 +334,23 @@ fun DownloadScreen(viewModel: MainViewModel) {
             }
         }
 
-        // Video Info Card with Full-size Thumbnail
+        // Video Info Card with proper scrollable content
         videoInfo?.let {
             Spacer(modifier = Modifier.height(16.dp))
-            VideoInfoCard(
-                videoInfo = it,
-                selectedVideoFormat = selectedVideoFormat,
-                selectedAudioFormat = selectedAudioFormat,
-                onVideoFormatSelected = { format: VideoFormat -> viewModel.selectVideoFormat(format) },
-                onAudioFormatSelected = { format: VideoFormat -> viewModel.selectAudioFormat(format) },
-                onDownloadClicked = { vFormat: VideoFormat, aFormat: VideoFormat ->
-                    viewModel.downloadVideo(it, vFormat, aFormat)
-                }
-            )
+
+            // Make the video info card take remaining space and be scrollable
+            Box(modifier = Modifier.weight(1f)) {
+                VideoInfoCard(
+                    videoInfo = it,
+                    selectedVideoFormat = selectedVideoFormat,
+                    selectedAudioFormat = selectedAudioFormat,
+                    onVideoFormatSelected = { format: VideoFormat -> viewModel.selectVideoFormat(format) },
+                    onAudioFormatSelected = { format: VideoFormat -> viewModel.selectAudioFormat(format) },
+                    onDownloadClicked = { vFormat: VideoFormat, aFormat: VideoFormat ->
+                        viewModel.downloadVideo(it, vFormat, aFormat)
+                    }
+                )
+            }
         }
     }
 }
@@ -361,104 +366,126 @@ fun VideoInfoCard(
     onDownloadClicked: (VideoFormat, VideoFormat) -> Unit
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxSize(),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            // Full-size Thumbnail at the top
-            AsyncImage(
-                model = videoInfo.thumbnail,
-                contentDescription = "Video Thumbnail",
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(200.dp)
-                    .clip(RoundedCornerShape(8.dp)),
-                contentScale = ContentScale.Crop
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // Full-size Thumbnail
+            item {
+                AsyncImage(
+                    model = videoInfo.thumbnail,
+                    contentDescription = "Video Thumbnail",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(200.dp)
+                        .clip(RoundedCornerShape(8.dp)),
+                    contentScale = ContentScale.Crop
+                )
+            }
 
             // Video Information
-            Column {
-                Text(
-                    text = videoInfo.title ?: "Unknown Title",
-                    style = MaterialTheme.typography.titleLarge,
-                    textAlign = TextAlign.Start
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+            item {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Uploader: ${videoInfo.uploader ?: "Unknown"}",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "Duration: ${formatDuration(videoInfo.duration)}",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                    Text(
+                        text = videoInfo.title ?: "Unknown Title",
+                        style = MaterialTheme.typography.titleLarge,
+                        textAlign = TextAlign.Start
+                    )
+
+                    Text(
+                        text = "Uploader: ${videoInfo.uploader ?: "Unknown"}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Text(
+                        text = "Duration: ${formatDuration(videoInfo.duration)}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            // Quality Selection Section
+            item {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = "Quality Selection",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
 
-            // Quality Selection
-            val videoFormats = videoInfo.formats
-                ?.filter { it.vcodec != "none" && it.acodec == "none" }
-                ?: emptyList()
-            val audioFormats = videoInfo.formats
-                ?.filter { it.acodec != "none" && it.vcodec == "none" }
-                ?: emptyList()
+                    val videoFormats = videoInfo.formats
+                        ?.filter { it.vcodec != "none" && it.acodec == "none" }
+                        ?: emptyList()
+                    val audioFormats = videoInfo.formats
+                        ?.filter { it.acodec != "none" && it.vcodec == "none" }
+                        ?: emptyList()
 
-            Row(Modifier.fillMaxWidth()) {
-                QualityDropdown(
-                    modifier = Modifier.weight(1f),
-                    label = "Video Quality",
-                    items = videoFormats,
-                    selectedItem = selectedVideoFormat,
-                    onItemSelected = onVideoFormatSelected,
-                    itemLabel = { format ->
-                        "${format.height ?: "?"}p${format.fps?.let { "/$it" } ?: ""} (${format.getFormattedFileSize()})"
-                    }
-                )
+                    // Video Quality Dropdown
+                    QualityDropdown(
+                        modifier = Modifier.fillMaxWidth(),
+                        label = "Video Quality",
+                        items = videoFormats,
+                        selectedItem = selectedVideoFormat,
+                        onItemSelected = onVideoFormatSelected,
+                        itemLabel = { format ->
+                            "${format.height ?: "?"}p${format.fps?.let { "/$it" } ?: ""} (${format.getFormattedFileSize()})"
+                        }
+                    )
 
-                Spacer(modifier = Modifier.width(8.dp))
-
-                QualityDropdown(
-                    modifier = Modifier.weight(1f),
-                    label = "Audio Quality",
-                    items = audioFormats,
-                    selectedItem = selectedAudioFormat,
-                    onItemSelected = onAudioFormatSelected,
-                    itemLabel = { format ->
-                        "${format.abr ?: "?"}kbps (${format.getFormattedFileSize()})"
-                    }
-                )
+                    // Audio Quality Dropdown
+                    QualityDropdown(
+                        modifier = Modifier.fillMaxWidth(),
+                        label = "Audio Quality",
+                        items = audioFormats,
+                        selectedItem = selectedAudioFormat,
+                        onItemSelected = onAudioFormatSelected,
+                        itemLabel = { format ->
+                            "${format.abr ?: "?"}kbps (${format.getFormattedFileSize()})"
+                        }
+                    )
+                }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-
             // Download Button
-            Button(
-                onClick = {
-                    if (selectedVideoFormat != null && selectedAudioFormat != null) {
-                        onDownloadClicked(selectedVideoFormat, selectedAudioFormat)
-                    }
-                },
-                modifier = Modifier.fillMaxWidth(),
-                enabled = selectedVideoFormat != null && selectedAudioFormat != null
-            ) {
-                Icon(Icons.Default.Download, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Download Video")
+            item {
+                Button(
+                    onClick = {
+                        if (selectedVideoFormat != null && selectedAudioFormat != null) {
+                            onDownloadClicked(selectedVideoFormat, selectedAudioFormat)
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
+                    enabled = selectedVideoFormat != null && selectedAudioFormat != null
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Download,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Download Video",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                }
+            }
+
+            // Add some bottom padding to ensure the download button is fully visible
+            item {
+                Spacer(modifier = Modifier.height(16.dp))
             }
         }
     }
@@ -489,12 +516,16 @@ fun <T> QualityDropdown(
             trailingIcon = {
                 ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
             },
-            modifier = Modifier.menuAnchor()
+            modifier = Modifier
+                .fillMaxWidth()
+                .menuAnchor(),
+            singleLine = true
         )
 
         ExposedDropdownMenu(
             expanded = expanded,
-            onDismissRequest = { expanded = false }
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.fillMaxWidth()
         ) {
             items.forEach { item ->
                 DropdownMenuItem(
@@ -507,7 +538,8 @@ fun <T> QualityDropdown(
                     onClick = {
                         onItemSelected(item)
                         expanded = false
-                    }
+                    },
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
         }
