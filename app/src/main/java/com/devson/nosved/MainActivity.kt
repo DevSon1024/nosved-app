@@ -12,7 +12,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -20,6 +22,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.navigation.NavController
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
 import coil.compose.AsyncImage
 import com.devson.nosved.ui.theme.NosvedTheme
 import com.yausername.ffmpeg.FFmpeg
@@ -65,7 +71,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    DownloadScreen(viewModel)
+                    NosvedApp(viewModel)
                 }
             }
         }
@@ -73,7 +79,20 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun DownloadScreen(viewModel: MainViewModel) {
+fun NosvedApp(viewModel: MainViewModel) {
+    val navController = rememberNavController()
+    NavHost(navController = navController, startDestination = "download_screen") {
+        composable("download_screen") {
+            DownloadScreen(viewModel, navController)
+        }
+        composable("download_queue") {
+            DownloadQueueScreen(viewModel, navController)
+        }
+    }
+}
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DownloadScreen(viewModel: MainViewModel, navController: NavController) {
     var url by remember { mutableStateOf("") }
     val videoInfo by viewModel.videoInfo.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
@@ -81,50 +100,94 @@ fun DownloadScreen(viewModel: MainViewModel) {
     val selectedAudioFormat by viewModel.selectedAudioFormat.collectAsState()
 
 
-    Column(
-        modifier = Modifier
-            .padding(16.dp)
-            .fillMaxWidth()
-    ) {
-        OutlinedTextField(
-            value = url,
-            onValueChange = { url = it },
-            label = { Text("Enter URL") },
-            modifier = Modifier.fillMaxWidth(),
-            trailingIcon = {
-                if (url.isNotEmpty()) {
-                    IconButton(onClick = { url = "" }) {
-                        Icon(Icons.Default.Clear, contentDescription = "Clear")
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Nosved") },
+                actions = {
+                    IconButton(onClick = { /* TODO: Implement settings */ }) {
+                        Icon(Icons.Default.Settings, contentDescription = "Settings")
                     }
                 }
-            }
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Button(
-            onClick = { viewModel.fetchVideoInfo(url) },
-            modifier = Modifier.fillMaxWidth(),
-            enabled = !isLoading && url.isNotBlank()
+            )
+        }
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .padding(paddingValues)
+                .padding(16.dp)
+                .fillMaxWidth()
         ) {
-            Text("Search Video")
-        }
-
-        if (isLoading) {
-            Spacer(modifier = Modifier.height(16.dp))
-            CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
-        }
-
-        videoInfo?.let {
-            Spacer(modifier = Modifier.height(16.dp))
-            VideoInfoCard(
-                videoInfo = it,
-                selectedVideoFormat = selectedVideoFormat,
-                selectedAudioFormat = selectedAudioFormat,
-                onVideoFormatSelected = { format -> viewModel.selectVideoFormat(format) },
-                onAudioFormatSelected = { format -> viewModel.selectAudioFormat(format) },
-                onDownloadClicked = { vFormat, aFormat ->
-                    viewModel.downloadVideo(it, vFormat, aFormat)
+            OutlinedTextField(
+                value = url,
+                onValueChange = { url = it },
+                label = { Text("Enter URL") },
+                modifier = Modifier.fillMaxWidth(),
+                trailingIcon = {
+                    if (url.isNotEmpty()) {
+                        IconButton(onClick = { url = "" }) {
+                            Icon(Icons.Default.Clear, contentDescription = "Clear")
+                        }
+                    }
                 }
             )
+            Spacer(modifier = Modifier.height(8.dp))
+            Button(
+                onClick = { viewModel.fetchVideoInfo(url) },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !isLoading && url.isNotBlank()
+            ) {
+                Text("Search Video")
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+            Button(
+                onClick = { navController.navigate("download_queue") },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("View Download Queue")
+            }
+
+            if (isLoading) {
+                Spacer(modifier = Modifier.height(16.dp))
+                CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
+            }
+
+            videoInfo?.let {
+                Spacer(modifier = Modifier.height(16.dp))
+                VideoInfoCard(
+                    videoInfo = it,
+                    selectedVideoFormat = selectedVideoFormat,
+                    selectedAudioFormat = selectedAudioFormat,
+                    onVideoFormatSelected = { format -> viewModel.selectVideoFormat(format) },
+                    onAudioFormatSelected = { format -> viewModel.selectAudioFormat(format) },
+                    onDownloadClicked = { vFormat, aFormat ->
+                        viewModel.downloadVideo(it, vFormat, aFormat)
+                    }
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DownloadQueueScreen(viewModel: MainViewModel, navController: NavController) {
+    // TODO: Implement UI for download queue
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Download Queue") },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                    }
+                }
+            )
+        }
+    ) { paddingValues ->
+        Box(modifier = Modifier.padding(paddingValues).fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text("Download queue will be shown here.", textAlign = TextAlign.Center)
         }
     }
 }
@@ -182,7 +245,7 @@ fun VideoInfoCard(
                     items = videoFormats,
                     selectedItem = selectedVideoFormat,
                     onItemSelected = onVideoFormatSelected,
-                    itemLabel = { "${it.height}p${it.fps ?: ""} (${it.getFormattedFileSize()})" }
+                    itemLabel = { "${it.height}p${it.fps ?: ""} (${it.fileSize.toString()})" }
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 QualityDropdown(
@@ -191,7 +254,7 @@ fun VideoInfoCard(
                     items = audioFormats,
                     selectedItem = selectedAudioFormat,
                     onItemSelected = onAudioFormatSelected,
-                    itemLabel = { "${it.abr}kbps (${it.getFormattedFileSize()})" }
+                    itemLabel = { "${it.abr}kbps (${it.fileSize.toString()})" }
                 )
             }
 

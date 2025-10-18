@@ -6,12 +6,12 @@ plugins {
 
 android {
     namespace = "com.devson.nosved"
-    compileSdk = 36 // Assuming release 36 is correct; adjust if necessary
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.devson.nosved"
         minSdk = 24
-        targetSdk = 36
+        targetSdk = 35
         versionCode = 1
         versionName = "1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -23,16 +23,12 @@ android {
     signingConfigs {
         create("release") {
             // This is a placeholder for your signing configuration.
-            // You can either configure it here or let Android Studio handle it during the build process.
         }
     }
 
     buildTypes {
         release {
-            // Enable code shrinking, obfuscation, and optimization.
             isMinifyEnabled = true
-
-            // Enable resource shrinking.
             isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -42,7 +38,6 @@ android {
         }
     }
 
-    // This block enables the ABI splits, similar to the "Seal" project
     flavorDimensions += "abi"
     productFlavors {
         create("arm64-v8a") {
@@ -75,18 +70,21 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+
     kotlinOptions {
         jvmTarget = "17"
     }
+
     buildFeatures {
         compose = true
     }
+
     composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.1" // Example version, adjust if needed
+        kotlinCompilerExtensionVersion = "1.5.8"
     }
+
     packaging {
         resources {
-            // youtube-dl has a built-in downloader as a fallback.
             jniLibs {
                 excludes += "**/libaria2c.so"
             }
@@ -98,32 +96,62 @@ android {
 val youtubedlAndroid = "0.18.0"
 
 dependencies {
+    // YouTubeDL Android
     implementation("io.github.junkfood02.youtubedl-android:library:${youtubedlAndroid}")
     implementation("io.github.junkfood02.youtubedl-android:ffmpeg:${youtubedlAndroid}")
-//    implementation("io.github.junkfood02.youtubedl-android:aria2c:${youtubedlAndroid}")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.7.0")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
-    implementation("androidx.activity:activity-compose:1.9.0")
-    implementation(platform("androidx.compose:compose-bom:2023.08.00"))
-    implementation("io.coil-kt:coil-compose:2.5.0")
 
+    // Core Android Components
+    implementation("androidx.core:core-ktx:1.12.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
+    implementation("androidx.activity:activity-compose:1.8.2")
+
+    // Compose BOM and UI
+    implementation(platform("androidx.compose:compose-bom:2024.02.00"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
-    implementation(libs.androidx.core.ktx)
-    implementation(libs.androidx.lifecycle.runtime.ktx)
-    implementation(libs.androidx.activity.compose)
-    implementation(platform(libs.androidx.compose.bom))
-    implementation(libs.androidx.compose.ui)
-    implementation(libs.androidx.compose.ui.graphics)
-    implementation(libs.androidx.compose.ui.tooling.preview)
-    implementation(libs.androidx.compose.material3)
-    testImplementation(libs.junit)
-    androidTestImplementation(libs.androidx.junit)
-    androidTestImplementation(libs.androidx.espresso.core)
-    androidTestImplementation(platform(libs.androidx.compose.bom))
-    androidTestImplementation(libs.androidx.compose.ui.test.junit4)
-    debugImplementation(libs.androidx.compose.ui.tooling)
-    debugImplementation(libs.androidx.compose.ui.test.manifest)
+    implementation("androidx.compose.material:material-icons-extended")
+
+    // Navigation
+    implementation("androidx.navigation:navigation-compose:2.7.6")
+
+    // Lifecycle and ViewModel
+    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.7.0")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
+
+    // Room Database
+    implementation("androidx.room:room-runtime:2.6.1")
+    implementation("androidx.room:room-ktx:2.6.1")
+    implementation("androidx.room:room-compiler:2.6.1")
+
+    // Image Loading
+    implementation("io.coil-kt:coil-compose:2.5.0")
+
+    // Date/Time
+    implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.5.0")
+
+    // JSON Parsing
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.2")
+
+    // Permissions
+    implementation("com.google.accompanist:accompanist-permissions:0.32.0")
+
+    // File Picker
+    implementation("androidx.documentfile:documentfile:1.0.1")
+
+    // Media3 for video playback
+    implementation("androidx.media3:media3-exoplayer:1.2.1")
+    implementation("androidx.media3:media3-ui:1.2.1")
+
+    // Testing
+    testImplementation("junit:junit:4.13.2")
+    androidTestImplementation("androidx.test.ext:junit:1.1.5")
+    androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
+    androidTestImplementation(platform("androidx.compose:compose-bom:2024.02.00"))
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+
+    // Debug
+    debugImplementation("androidx.compose.ui:ui-tooling")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
