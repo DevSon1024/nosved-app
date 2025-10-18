@@ -275,12 +275,12 @@ private fun clearAppCache(context: Context) {
 }
 
 private fun openGitHub(context: Context) {
-    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/DevSon1024/nosved"))
+    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/DevSon1024/nosved-app"))
     context.startActivity(intent)
 }
 
 private fun openIssueTracker(context: Context) {
-    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/DevSon1024/nosved/issues"))
+    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/DevSon1024/nosved-app/issues"))
     context.startActivity(intent)
 }
 

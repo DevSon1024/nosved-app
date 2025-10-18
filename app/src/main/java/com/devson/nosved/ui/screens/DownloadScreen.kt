@@ -35,84 +35,93 @@ fun DownloadsScreen(viewModel: MainViewModel) {
     val downloadProgress by viewModel.downloadProgress.collectAsState()
 
     Column(modifier = Modifier.fillMaxSize()) {
-        // Top App Bar
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.End
+        // Tab Row with improved spacing and better layout
+        TabRow(
+            selectedTabIndex = selectedTab,
+            modifier = Modifier.fillMaxWidth()
         ) {
-            TextButton(
-                onClick = { viewModel.clearCompletedDownloads() }
-            ) {
-                Icon(Icons.Default.Clear, contentDescription = null)
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("Clear Completed")
-            }
-        }
-
-        // Tab Row
-        TabRow(selectedTabIndex = selectedTab) {
             Tab(
                 selected = selectedTab == 0,
                 onClick = { selectedTab = 0 },
-                text = { Text("All (${allDownloads.size})") }
+                text = {
+                    Text(
+                        text = "All (${allDownloads.size})",
+                        maxLines = 1
+                    )
+                }
             )
             Tab(
                 selected = selectedTab == 1,
                 onClick = { selectedTab = 1 },
-                text = { Text("Running (${runningDownloads.size})") }
+                text = {
+                    Text(
+                        text = "Active (${runningDownloads.size})",
+                        maxLines = 1
+                    )
+                }
             )
             Tab(
                 selected = selectedTab == 2,
                 onClick = { selectedTab = 2 },
-                text = { Text("Completed (${completedDownloads.size})") }
+                text = {
+                    Text(
+                        text = "Completed (${completedDownloads.size})",
+                        maxLines = 1
+                    )
+                }
             )
             Tab(
                 selected = selectedTab == 3,
                 onClick = { selectedTab = 3 },
-                text = { Text("Failed (${failedDownloads.size})") }
+                text = {
+                    Text(
+                        text = "Failed (${failedDownloads.size})",
+                        maxLines = 1
+                    )
+                }
             )
         }
 
-        // Content based on selected tab
-        when (selectedTab) {
-            0 -> DownloadList(
-                downloads = allDownloads,
-                downloadProgress = downloadProgress,
-                onCancelDownload = { viewModel.cancelDownload(it) },
-                onRetryDownload = { viewModel.retryDownload(it) },
-                onDeleteDownload = { viewModel.deleteDownload(it) },
-                onPlayVideo = { playVideo(context, it) },
-                onShareVideo = { shareVideo(context, it) }
-            )
-            1 -> DownloadList(
-                downloads = runningDownloads,
-                downloadProgress = downloadProgress,
-                onCancelDownload = { viewModel.cancelDownload(it) },
-                onRetryDownload = { viewModel.retryDownload(it) },
-                onDeleteDownload = { viewModel.deleteDownload(it) },
-                onPlayVideo = { playVideo(context, it) },
-                onShareVideo = { shareVideo(context, it) }
-            )
-            2 -> DownloadList(
-                downloads = completedDownloads,
-                downloadProgress = downloadProgress,
-                onCancelDownload = { viewModel.cancelDownload(it) },
-                onRetryDownload = { viewModel.retryDownload(it) },
-                onDeleteDownload = { viewModel.deleteDownload(it) },
-                onPlayVideo = { playVideo(context, it) },
-                onShareVideo = { shareVideo(context, it) }
-            )
-            3 -> DownloadList(
-                downloads = failedDownloads,
-                downloadProgress = downloadProgress,
-                onCancelDownload = { viewModel.cancelDownload(it) },
-                onRetryDownload = { viewModel.retryDownload(it) },
-                onDeleteDownload = { viewModel.deleteDownload(it) },
-                onPlayVideo = { playVideo(context, it) },
-                onShareVideo = { shareVideo(context, it) }
-            )
+        // Content based on selected tab with consistent padding
+        Box(modifier = Modifier.fillMaxSize()) {
+            when (selectedTab) {
+                0 -> DownloadList(
+                    downloads = allDownloads,
+                    downloadProgress = downloadProgress,
+                    onCancelDownload = { viewModel.cancelDownload(it) },
+                    onRetryDownload = { viewModel.retryDownload(it) },
+                    onDeleteDownload = { viewModel.deleteDownload(it) },
+                    onPlayVideo = { playVideo(context, it) },
+                    onShareVideo = { shareVideo(context, it) }
+                )
+                1 -> DownloadList(
+                    downloads = runningDownloads,
+                    downloadProgress = downloadProgress,
+                    onCancelDownload = { viewModel.cancelDownload(it) },
+                    onRetryDownload = { viewModel.retryDownload(it) },
+                    onDeleteDownload = { viewModel.deleteDownload(it) },
+                    onPlayVideo = { playVideo(context, it) },
+                    onShareVideo = { shareVideo(context, it) }
+                )
+                2 -> DownloadList(
+                    downloads = completedDownloads,
+                    downloadProgress = downloadProgress,
+                    onCancelDownload = { viewModel.cancelDownload(it) },
+                    onRetryDownload = { viewModel.retryDownload(it) },
+                    onDeleteDownload = { viewModel.deleteDownload(it) },
+                    onPlayVideo = { playVideo(context, it) },
+                    onShareVideo = { shareVideo(context, it) }
+                )
+                3 -> DownloadList(
+                    downloads = failedDownloads,
+                    downloadProgress = downloadProgress,
+                    onCancelDownload = { viewModel.cancelDownload(it) },
+                    onRetryDownload = { viewModel.retryDownload(it) },
+                    onDeleteDownload = { viewModel.deleteDownload(it) },
+                    onPlayVideo = { playVideo(context, it) },
+                    onShareVideo = { shareVideo(context, it) }
+                )
+            }
         }
     }
 }
@@ -132,16 +141,34 @@ fun DownloadList(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
         ) {
-            Text(
-                text = "No downloads found",
-                style = MaterialTheme.typography.bodyLarge
-            )
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.DownloadDone,
+                    contentDescription = null,
+                    modifier = Modifier.size(64.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "No downloads found",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = "Your download history will appear here",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                )
+            }
         }
     } else {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             items(downloads) { download ->
                 DownloadItem(
@@ -170,71 +197,103 @@ fun DownloadItem(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+        )
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                // Thumbnail
-                AsyncImage(
-                    model = download.thumbnail,
-                    contentDescription = "Video Thumbnail",
-                    modifier = Modifier.size(60.dp)
-                )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                // Thumbnail with better styling
+                Card(
+                    modifier = Modifier.size(64.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                ) {
+                    AsyncImage(
+                        model = download.thumbnail,
+                        contentDescription = "Video Thumbnail",
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
 
                 Spacer(modifier = Modifier.width(12.dp))
 
-                // Title and details
+                // Title and details with improved layout
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = download.title,
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.titleSmall,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
 
                     Spacer(modifier = Modifier.height(4.dp))
 
-                    Row {
+                    // Format info with better spacing
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         download.videoFormat?.let {
-                            Text(
-                                text = it,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            Surface(
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                                shape = MaterialTheme.shapes.small,
+                                modifier = Modifier.padding(0.dp)
+                            ) {
+                                Text(
+                                    text = it,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
                         }
 
                         download.audioFormat?.let {
-                            Text(
-                                text = " • $it",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            Surface(
+                                color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f),
+                                shape = MaterialTheme.shapes.small
+                            ) {
+                                Text(
+                                    text = it,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.secondary,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
                         }
                     }
 
                     download.uploader?.let {
+                        Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = "by $it",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
 
-                // Status indicator
+                // Status indicator with better positioning
                 StatusIndicator(download.status)
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Progress bar (only for downloading)
+            // Progress section with improved styling
             if (download.status == DownloadStatus.DOWNLOADING) {
+                Spacer(modifier = Modifier.height(12.dp))
+
                 LinearProgressIndicator(
                     progress = { (progress?.progress ?: download.progress) / 100f },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant,
                 )
 
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -242,30 +301,40 @@ fun DownloadItem(
                 ) {
                     Text(
                         text = "${progress?.progress ?: download.progress}%",
-                        style = MaterialTheme.typography.bodySmall
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
                     )
 
                     progress?.let {
                         Text(
-                            text = "${it.speed} • ETA ${it.eta}",
-                            style = MaterialTheme.typography.bodySmall
+                            text = "${it.speed}${if (it.eta.isNotEmpty()) " • ETA ${it.eta}" else ""}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
             }
 
-            // Error message (only for failed)
+            // Error message with better styling
             if (download.status == DownloadStatus.FAILED && !download.error.isNullOrEmpty()) {
-                Text(
-                    text = "Error: ${download.error}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error
-                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Surface(
+                    color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f),
+                    shape = MaterialTheme.shapes.small,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "Error: ${download.error}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(8.dp)
+                    )
+                }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-            // Action buttons
+            // Action buttons with improved layout
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -274,9 +343,16 @@ fun DownloadItem(
                     DownloadStatus.DOWNLOADING -> {
                         OutlinedButton(
                             onClick = { onCancelDownload(download.id) },
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = MaterialTheme.colorScheme.error
+                            )
                         ) {
-                            Icon(Icons.Default.Stop, contentDescription = null)
+                            Icon(
+                                imageVector = Icons.Default.Stop,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text("Cancel")
                         }
@@ -288,7 +364,11 @@ fun DownloadItem(
                                 onClick = { onPlayVideo(download.filePath) },
                                 modifier = Modifier.weight(1f)
                             ) {
-                                Icon(Icons.Default.PlayArrow, contentDescription = null)
+                                Icon(
+                                    imageVector = Icons.Default.PlayArrow,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text("Play")
                             }
@@ -297,7 +377,11 @@ fun DownloadItem(
                                 onClick = { onShareVideo(download.filePath) },
                                 modifier = Modifier.weight(1f)
                             ) {
-                                Icon(Icons.Default.Share, contentDescription = null)
+                                Icon(
+                                    imageVector = Icons.Default.Share,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text("Share")
                             }
@@ -309,23 +393,54 @@ fun DownloadItem(
                             onClick = { onRetryDownload(download.id) },
                             modifier = Modifier.weight(1f)
                         ) {
-                            Icon(Icons.Default.Refresh, contentDescription = null)
+                            Icon(
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text("Retry")
                         }
                     }
 
-                    else -> {}
+                    DownloadStatus.QUEUED -> {
+                        OutlinedButton(
+                            onClick = { onCancelDownload(download.id) },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Schedule,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Queued")
+                        }
+                    }
+
+                    else -> {
+                        // For cancelled or other states, just show spacer
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
                 }
 
-                // Delete button (always available)
+                // Delete button (always available) with consistent sizing
                 OutlinedButton(
                     onClick = { onDeleteDownload(download.id) },
                     colors = ButtonDefaults.outlinedButtonColors(
                         contentColor = MaterialTheme.colorScheme.error
-                    )
+                    ),
+                    modifier = Modifier.size(width = 56.dp, height = 40.dp),
+                    contentPadding = PaddingValues(0.dp)
                 ) {
-                    Icon(Icons.Default.Delete, contentDescription = "Delete")
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = "Delete",
+                        modifier = Modifier.size(18.dp)
+                    )
                 }
             }
         }
@@ -343,12 +458,19 @@ fun StatusIndicator(status: DownloadStatus) {
         DownloadStatus.CANCELLED -> MaterialTheme.colorScheme.onSurfaceVariant to Icons.Default.Cancel
     }
 
-    Icon(
-        imageVector = icon,
-        contentDescription = status.name,
-        tint = color,
-        modifier = Modifier.size(24.dp)
-    )
+    Surface(
+        color = color.copy(alpha = 0.1f),
+        shape = MaterialTheme.shapes.small
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = status.name,
+            tint = color,
+            modifier = Modifier
+                .size(28.dp)
+                .padding(4.dp)
+        )
+    }
 }
 
 private fun playVideo(context: Context, filePath: String) {

@@ -218,11 +218,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun clearCompletedDownloads() {
-        viewModelScope.launch {
-            downloadDao.clearCompletedDownloads()
-        }
-    }
+    // Removed clearCompletedDownloads() function as requested
+    // This function is no longer available since we're treating downloads as history
 
     private fun extractSpeed(line: String): String {
         val speedRegex = "([0-9.]+[KMG]iB/s)".toRegex()
