@@ -59,6 +59,8 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
+        resValues = false
     }
 
     composeOptions {
@@ -73,6 +75,10 @@ android {
             excludes += "/META-INF/LICENSE.txt"
             excludes += "/META-INF/NOTICE"
             excludes += "/META-INF/NOTICE.txt"
+            excludes += "**/kotlin/**"
+            excludes += "**/*.kotlin_metadata"
+            excludes += "**/*.version"
+            excludes += "**/kotlin-tooling-metadata.json"
         }
         jniLibs.useLegacyPackaging = true  // Important for native libraries
     }
@@ -125,11 +131,8 @@ dependencies {
     // File Picker
     implementation("androidx.documentfile:documentfile:1.0.1")
 
-    // Media3 for video playback
-    implementation("androidx.media3:media3-exoplayer:1.2.1")
-    implementation("androidx.media3:media3-ui:1.2.1")
-
     // Testing
+    implementation("com.tencent:mmkv:1.3.9")
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
