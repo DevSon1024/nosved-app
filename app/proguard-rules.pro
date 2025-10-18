@@ -1,21 +1,76 @@
-# Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
-#
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
+# Disable obfuscation to prevent crashes (like Seal app)
+-dontobfuscate
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# Keep YouTubeDL Android library
+-keep class com.yausername.** { *; }
+-keep class org.apache.commons.compress.archivers.zip.** { *; }
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+# Keep native libraries and JNI
+-keepclasseswithmembernames class * {
+    native <methods>;
+}
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# Kotlinx Serialization Rules
+-keepattributes *Annotation*, InnerClasses
+-dontnote kotlinx.serialization.AnnotationsKt
+
+# Keep Serializable classes
+-if @kotlinx.serialization.Serializable class **
+-keepclassmembers class <1> {
+    static <1>$Companion Companion;
+}
+
+# Keep serializer methods
+-if @kotlinx.serialization.Serializable class ** {
+    static **$* *;
+}
+-keepclassmembers class <2>$<3> {
+    kotlinx.serialization.KSerializer serializer(...);
+}
+
+# Keep INSTANCE serializers for objects
+-if @kotlinx.serialization.Serializable class ** {
+    public static ** INSTANCE;
+}
+-keepclassmembers class <1> {
+    public static <1> INSTANCE;
+    kotlinx.serialization.KSerializer serializer(...);
+}
+
+# Room Database
+-keep class * extends androidx.room.RoomDatabase
+-keep @androidx.room.Entity class *
+-keep @androidx.room.Dao class *
+-keepclassmembers class * {
+    @androidx.room.* <methods>;
+}
+
+# Jetpack Compose
+-keep class androidx.compose.** { *; }
+-keepclassmembers class androidx.compose.** { *; }
+
+# ViewModel and LiveData
+-keep class * extends androidx.lifecycle.ViewModel {
+    <init>(...);
+}
+-keep class * extends androidx.lifecycle.AndroidViewModel {
+    <init>(...);
+}
+
+# Keep your data classes and models
+-keep class com.devson.nosved.data.** { *; }
+-keepclassmembers class com.devson.nosved.data.** { *; }
+
+# Media3 ExoPlayer
+-keep class com.google.android.exoplayer2.** { *; }
+-keep class androidx.media3.** { *; }
+
+# Coil image loading
+-keep class coil.** { *; }
+
+# Permissions library
+-keep class com.google.accompanist.permissions.** { *; }
+
+# Keep line numbers for debugging
+-keepattributes SourceFile,LineNumberTable
+-renamesourcefileattribute SourceFile
