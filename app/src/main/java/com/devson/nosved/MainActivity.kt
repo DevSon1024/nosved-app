@@ -17,6 +17,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.navigation.compose.NavHost
@@ -26,6 +27,7 @@ import androidx.navigation.compose.rememberNavController
 import coil.compose.AsyncImage
 import com.devson.nosved.ui.theme.NosvedTheme
 import com.devson.nosved.ui.screens.DownloadsScreen
+import com.devson.nosved.ui.screens.SettingsScreen
 import com.yausername.ffmpeg.FFmpeg
 import com.yausername.youtubedl_android.YoutubeDL
 import com.yausername.youtubedl_android.YoutubeDLException
@@ -80,6 +82,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainContent(viewModel: MainViewModel) {
     val navController = rememberNavController()
@@ -87,6 +90,85 @@ fun MainContent(viewModel: MainViewModel) {
     val currentDestination = currentBackStackEntry?.destination?.route
 
     Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        // App Icon
+                        Icon(
+                            imageVector = Icons.Default.VideoLibrary,
+                            contentDescription = "App Logo",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(32.dp)
+                        )
+
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        // App Name
+                        Text(
+                            text = "Nosved",
+                            style = MaterialTheme.typography.headlineSmall.copy(
+                                fontWeight = FontWeight.Bold
+                            ),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                },
+                actions = {
+                    // Notification/Downloads count indicator
+                    val allDownloads by viewModel.allDownloads.collectAsState(initial = emptyList())
+                    val runningDownloads = allDownloads.count {
+                        it.status == com.devson.nosved.data.DownloadStatus.DOWNLOADING ||
+                                it.status == com.devson.nosved.data.DownloadStatus.QUEUED
+                    }
+
+                    if (runningDownloads > 0) {
+                        BadgedBox(
+                            badge = {
+                                Badge {
+                                    Text("$runningDownloads")
+                                }
+                            }
+                        ) {
+                            IconButton(
+                                onClick = {
+                                    navController.navigate("downloads") {
+                                        launchSingleTop = true
+                                    }
+                                }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CloudDownload,
+                                    contentDescription = "Active Downloads"
+                                )
+                            }
+                        }
+                    }
+
+                    // Settings Button
+                    IconButton(
+                        onClick = {
+                            navController.navigate("settings") {
+                                launchSingleTop = true
+                            }
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = "Settings"
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    titleContentColor = MaterialTheme.colorScheme.onSurface,
+                    actionIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            )
+        },
         bottomBar = {
             NavigationBar {
                 NavigationBarItem(
@@ -103,7 +185,25 @@ fun MainContent(viewModel: MainViewModel) {
                     }
                 )
                 NavigationBarItem(
-                    icon = { Icon(Icons.Default.List, contentDescription = null) },
+                    icon = {
+                        val allDownloads by viewModel.allDownloads.collectAsState(initial = emptyList())
+                        val runningCount = allDownloads.count {
+                            it.status == com.devson.nosved.data.DownloadStatus.DOWNLOADING ||
+                                    it.status == com.devson.nosved.data.DownloadStatus.QUEUED
+                        }
+
+                        if (runningCount > 0) {
+                            BadgedBox(
+                                badge = {
+                                    Badge { Text("$runningCount") }
+                                }
+                            ) {
+                                Icon(Icons.Default.List, contentDescription = null)
+                            }
+                        } else {
+                            Icon(Icons.Default.List, contentDescription = null)
+                        }
+                    },
                     label = { Text("Downloads") },
                     selected = currentDestination == "downloads",
                     onClick = {
@@ -129,6 +229,13 @@ fun MainContent(viewModel: MainViewModel) {
             composable("downloads") {
                 DownloadsScreen(viewModel)
             }
+            composable("settings") {
+                SettingsScreen(
+                    onNavigateBack = {
+                        navController.navigateUp()
+                    }
+                )
+            }
         }
     }
 }
@@ -150,7 +257,11 @@ fun DownloadScreen(viewModel: MainViewModel) {
             value = url,
             onValueChange = { url = it },
             label = { Text("Enter URL") },
+            placeholder = { Text("Paste video URL here...") },
             modifier = Modifier.fillMaxWidth(),
+            leadingIcon = {
+                Icon(Icons.Default.Link, contentDescription = null)
+            },
             trailingIcon = {
                 if (url.isNotEmpty()) {
                     IconButton(onClick = { url = "" }) {
@@ -167,12 +278,34 @@ fun DownloadScreen(viewModel: MainViewModel) {
             modifier = Modifier.fillMaxWidth(),
             enabled = !isLoading && url.isNotBlank()
         ) {
-            Text("Search Video")
+            if (isLoading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(16.dp),
+                    color = MaterialTheme.colorScheme.onPrimary
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Searching...")
+            } else {
+                Icon(Icons.Default.Search, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Search Video")
+            }
         }
 
         if (isLoading) {
-            Spacer(modifier = Modifier.height(16.dp))
-            CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
+            Spacer(modifier = Modifier.height(32.dp))
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                CircularProgressIndicator()
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    "Fetching video information...",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
 
         videoInfo?.let {
@@ -279,6 +412,8 @@ fun VideoInfoCard(
                 modifier = Modifier.fillMaxWidth(),
                 enabled = selectedVideoFormat != null && selectedAudioFormat != null
             ) {
+                Icon(Icons.Default.Download, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
                 Text("Download")
             }
         }

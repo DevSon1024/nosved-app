@@ -36,14 +36,20 @@ fun DownloadsScreen(viewModel: MainViewModel) {
 
     Column(modifier = Modifier.fillMaxSize()) {
         // Top App Bar
-        TopAppBar(
-            title = { Text("Downloads") },
-            actions = {
-                IconButton(onClick = { viewModel.clearCompletedDownloads() }) {
-                    Icon(Icons.Default.Clear, contentDescription = "Clear Completed")
-                }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.End
+        ) {
+            TextButton(
+                onClick = { viewModel.clearCompletedDownloads() }
+            ) {
+                Icon(Icons.Default.Clear, contentDescription = null)
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Clear Completed")
             }
-        )
+        }
 
         // Tab Row
         TabRow(selectedTabIndex = selectedTab) {
