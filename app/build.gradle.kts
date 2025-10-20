@@ -131,6 +131,8 @@ dependencies {
 
     // File Picker
     implementation("androidx.documentfile:documentfile:1.0.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
     // Testing
     implementation("com.tencent:mmkv:1.3.9")

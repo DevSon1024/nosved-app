@@ -9,16 +9,15 @@ import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.devson.nosved.data.*
+import com.devson.nosved.util.VideoInfoUtil
 import com.yausername.youtubedl_android.YoutubeDL
 import com.yausername.youtubedl_android.YoutubeDLException
 import com.yausername.youtubedl_android.YoutubeDLRequest
 import com.yausername.youtubedl_android.mapper.VideoFormat
 import com.yausername.youtubedl_android.mapper.VideoInfo
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.UUID
 
@@ -43,11 +42,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _downloadProgress = MutableStateFlow<Map<String, DownloadProgress>>(emptyMap())
     val downloadProgress = _downloadProgress.asStateFlow()
 
-    // New state for URL management
     private val _currentUrl = MutableStateFlow("")
     val currentUrl = _currentUrl.asStateFlow()
 
     private val notificationHelper = NotificationHelper(application)
+
+    // Keep track of current fetch job to cancel if needed
+    private var currentFetchJob: Job? = null
 
     // Download flows from database
     val allDownloads = downloadDao.getAllDownloads()
@@ -57,10 +58,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         notificationHelper.createNotificationChannel()
+        // Initialize YoutubeDL with minimal settings for speed
+        initializeYoutubeDLForSpeed()
+    }
+
+    private fun initializeYoutubeDLForSpeed() {
+        try {
+            // Set global settings for faster execution
+            System.setProperty("youtubedl.timeout", "5")
+            System.setProperty("youtubedl.retries", "1")
+        } catch (e: Exception) {
+            Log.w("NosvedApp", "Failed to set system properties", e)
+        }
     }
 
     fun updateUrl(url: String) {
         _currentUrl.value = url
+        // Cancel any ongoing fetch when URL changes
+        currentFetchJob?.cancel()
     }
 
     fun pasteFromClipboard(): String {
@@ -70,6 +85,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             if (clipData != null && clipData.itemCount > 0) {
                 val pastedText = clipData.getItemAt(0).text?.toString() ?: ""
                 _currentUrl.value = pastedText
+
+                // Auto-fetch info immediately after paste (like Seal does)
+                if (pastedText.isNotBlank() && isValidUrl(pastedText)) {
+                    fetchVideoInfo(pastedText)
+                }
+
                 showToast("URL pasted from clipboard")
                 pastedText
             } else {
@@ -82,7 +103,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private fun isValidUrl(url: String): Boolean {
+        return url.startsWith("http://") || url.startsWith("https://") ||
+                url.contains("youtube.com") || url.contains("youtu.be") ||
+                url.contains("instagram.com") || url.contains("tiktok.com") ||
+                url.contains("twitter.com") || url.contains("facebook.com")
+    }
+
     fun clearUrl() {
+        currentFetchJob?.cancel()
+        VideoInfoUtil.cancelFetch(_currentUrl.value)
         _currentUrl.value = ""
         _videoInfo.value = null
         _selectedVideoFormat.value = null
@@ -90,31 +120,74 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun fetchVideoInfo(url: String) {
-        viewModelScope.launch {
+        // Cancel any existing fetch
+        currentFetchJob?.cancel()
+        VideoInfoUtil.cancelFetch(url)
+
+        currentFetchJob = viewModelScope.launch {
             _isLoading.value = true
             _videoInfo.value = null
             _selectedVideoFormat.value = null
             _selectedAudioFormat.value = null
 
-            _videoInfo.value = withContext(Dispatchers.IO) {
-                try {
-                    YoutubeDL.getInstance().getInfo(url)
-                } catch (e: Exception) {
-                    Log.e("NosvedApp", "Failed to fetch video info", e)
-                    showToast("Failed to fetch video information")
-                    null
-                }
-            }
+            try {
+                // Show immediate loading state
+                showToast("Fetching video info...")
 
-            // Set default audio format (best quality)
-            _videoInfo.value?.let { info ->
+                val result = VideoInfoUtil.fetchVideoInfoFast(url)
+
+                result.onSuccess { info ->
+                    _videoInfo.value = info
+
+                    // Set default formats immediately
+                    launch {
+                        setDefaultFormats(info)
+                    }
+
+                    showToast("Video info loaded successfully")
+                }.onFailure { exception ->
+                    Log.e("NosvedApp", "Failed to fetch video info", exception)
+                    val errorMessage = when {
+                        exception is CancellationException -> "Fetch cancelled"
+                        exception.message?.contains("timeout") == true -> "Request timed out - try again"
+                        exception.message?.contains("network") == true -> "Network error - check connection"
+                        else -> "Failed to get video info: ${exception.message}"
+                    }
+                    showToast(errorMessage)
+                }
+            } catch (e: CancellationException) {
+                Log.d("NosvedApp", "Fetch cancelled")
+            } catch (e: Exception) {
+                Log.e("NosvedApp", "Unexpected error", e)
+                showToast("Unexpected error occurred")
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    private suspend fun setDefaultFormats(info: VideoInfo) {
+        withContext(Dispatchers.Default) {
+            try {
+                // Set best audio format
                 val bestAudioFormat = info.formats
                     ?.filter { it.acodec != "none" && it.vcodec == "none" }
                     ?.maxByOrNull { it.abr ?: 0 }
-                _selectedAudioFormat.value = bestAudioFormat
-            }
 
-            _isLoading.value = false
+                // Set best video format (720p or best available)
+                val bestVideoFormat = info.formats
+                    ?.filter { it.vcodec != "none" && it.acodec == "none" }
+                    ?.sortedByDescending { it.height ?: 0 }
+                    ?.firstOrNull { (it.height ?: 0) <= 720 }
+                    ?: info.formats?.filter { it.vcodec != "none" && it.acodec == "none" }?.firstOrNull()
+
+                withContext(Dispatchers.Main) {
+                    _selectedAudioFormat.value = bestAudioFormat
+                    _selectedVideoFormat.value = bestVideoFormat
+                }
+            } catch (e: Exception) {
+                Log.e("NosvedApp", "Error setting default formats", e)
+            }
         }
     }
 
@@ -145,10 +218,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             )
 
             downloadDao.insertDownload(downloadEntity)
-
-            // Show toast for download started
             showToast("Download started: ${videoInfo.title}")
-
             startDownload(downloadId, videoInfo, videoFormat, audioFormat)
         }
     }
@@ -178,6 +248,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 request?.addOption("-f", "${videoFormat.formatId}+${audioFormat.formatId}")
                 request?.addOption("--merge-output-format", "mp4")
 
+                // Optimized download settings
+                request?.addOption("--no-mtime")
+                request?.addOption("--concurrent-fragments", "8")
+                request?.addOption("--fragment-retries", "3")
+                request?.addOption("--socket-timeout", "10")
+                request?.addOption("--retries", "3")
+
                 if (request != null) {
                     YoutubeDL.getInstance().execute(request) { progress, _, line ->
                         Log.d("NosvedApp", "Download progress: $progress% - $line")
@@ -186,7 +263,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             val progressData = DownloadProgress(
                                 id = downloadId,
                                 progress = progress.toInt(),
-                                downloadedSize = 0L, // YoutubeDL doesn't provide exact bytes
+                                downloadedSize = 0L,
                                 totalSize = videoFormat.fileSize ?: 0L,
                                 speed = extractSpeed(line),
                                 eta = extractETA(line)
@@ -198,7 +275,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         }
                     }
 
-                    // Update completion status
                     downloadDao.updateDownload(
                         downloadDao.getDownloadById(downloadId)?.copy(
                             status = DownloadStatus.COMPLETED,
@@ -209,9 +285,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         ) ?: return@withContext
                     )
 
-                    // Show success toast
                     showToast("Download completed: ${videoInfo.title}")
-
                     notificationHelper.showDownloadCompleteNotification(
                         videoInfo.title ?: "Unknown Title",
                         filePath.absolutePath
@@ -220,8 +294,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
             } catch (e: YoutubeDLException) {
                 Log.e("NosvedApp", "Failed to download video", e)
-
-                // Show failure toast
                 showToast("Download failed: ${videoInfo.title}")
 
                 downloadDao.updateDownload(
@@ -252,8 +324,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             if (download != null && download.status == DownloadStatus.FAILED) {
                 downloadDao.updateDownloadStatus(downloadId, DownloadStatus.QUEUED)
                 showToast("Retrying download: ${download.title}")
-                // Re-fetch video info and restart download
-                // This is a simplified version - you might want to store format info
             }
         }
     }
@@ -262,7 +332,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val download = downloadDao.getDownloadById(downloadId)
             download?.let {
-                // Delete file if it exists
                 it.filePath?.let { path ->
                     val file = File(path)
                     if (file.exists()) {
@@ -273,6 +342,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 showToast("Download deleted: ${it.title}")
             }
         }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        currentFetchJob?.cancel()
+        VideoInfoUtil.clearCache()
     }
 
     private fun showToast(message: String) {
