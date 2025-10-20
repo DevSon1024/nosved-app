@@ -82,6 +82,7 @@ android {
         }
         jniLibs.useLegacyPackaging = true  // Important for native libraries
     }
+    ndkVersion= "27.0.12077973"
 }
 
 val youtubedlAndroid = "0.18.0"
