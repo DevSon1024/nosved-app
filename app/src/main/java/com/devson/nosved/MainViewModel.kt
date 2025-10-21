@@ -62,45 +62,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         initializeYoutubeDLForSpeed()
     }
 
-    private fun initializeYoutubeDLForSpeed() {
-        try {
-            // Set global settings for faster execution
-            System.setProperty("youtubedl.timeout", "5")
-            System.setProperty("youtubedl.retries", "1")
-        } catch (e: Exception) {
-            Log.w("NosvedApp", "Failed to set system properties", e)
-        }
-    }
-
     fun updateUrl(url: String) {
         _currentUrl.value = url
         // Cancel any ongoing fetch when URL changes
         currentFetchJob?.cancel()
-    }
-
-    fun pasteFromClipboard(): String {
-        return try {
-            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-            val clipData = clipboard.primaryClip
-            if (clipData != null && clipData.itemCount > 0) {
-                val pastedText = clipData.getItemAt(0).text?.toString() ?: ""
-                _currentUrl.value = pastedText
-
-                // Auto-fetch info immediately after paste (like Seal does)
-                if (pastedText.isNotBlank() && isValidUrl(pastedText)) {
-                    fetchVideoInfo(pastedText)
-                }
-
-                showToast("URL pasted from clipboard")
-                pastedText
-            } else {
-                showToast("Clipboard is empty")
-                ""
-            }
-        } catch (e: Exception) {
-            showToast("Failed to paste from clipboard")
-            ""
-        }
     }
 
     private fun isValidUrl(url: String): Boolean {
@@ -119,6 +84,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _selectedAudioFormat.value = null
     }
 
+    // Replace the existing fetchVideoInfo method with this optimized version
     fun fetchVideoInfo(url: String) {
         // Cancel any existing fetch
         currentFetchJob?.cancel()
@@ -131,40 +97,133 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _selectedAudioFormat.value = null
 
             try {
-                // Show immediate loading state
-                showToast("Fetching video info...")
-
-                val result = VideoInfoUtil.fetchVideoInfoFast(url)
-
-                result.onSuccess { info ->
-                    _videoInfo.value = info
-
-                    // Set default formats immediately
-                    launch {
-                        setDefaultFormats(info)
+                VideoInfoUtil.fetchVideoInfoProgressive(url) { progress ->
+                    when (progress.stage) {
+                        "Validating URL" -> showToast("🔍 Validating URL...")
+                        "Extracting info" -> showToast("⚡ Extracting video info...")
+                        "Complete" -> {
+                            progress.basicInfo?.let { info ->
+                                _videoInfo.value = info
+                                // Set default formats in background
+                                launch(Dispatchers.Default) {
+                                    setDefaultFormatsOptimized(info)
+                                }
+                                showToast("✅ Video info loaded!")
+                            }
+                        }
+                        "Cache hit" -> {
+                            progress.basicInfo?.let { info ->
+                                _videoInfo.value = info
+                                launch(Dispatchers.Default) {
+                                    setDefaultFormatsOptimized(info)
+                                }
+                                showToast("⚡ Loaded from cache")
+                            }
+                        }
                     }
-
-                    showToast("Video info loaded successfully")
                 }.onFailure { exception ->
                     Log.e("NosvedApp", "Failed to fetch video info", exception)
                     val errorMessage = when {
-                        exception is CancellationException -> "Fetch cancelled"
-                        exception.message?.contains("timeout") == true -> "Request timed out - try again"
-                        exception.message?.contains("network") == true -> "Network error - check connection"
-                        else -> "Failed to get video info: ${exception.message}"
+                        exception is CancellationException -> "❌ Fetch cancelled"
+                        exception is TimeoutCancellationException -> "⏱️ Request timed out - try again"
+                        exception.message?.contains("network") == true -> "🌐 Network error - check connection"
+                        exception.message?.contains("Invalid") == true -> "❌ Invalid or unsupported URL"
+                        else -> "❌ Failed to get video info"
                     }
                     showToast(errorMessage)
                 }
-            } catch (e: CancellationException) {
-                Log.d("NosvedApp", "Fetch cancelled")
             } catch (e: Exception) {
                 Log.e("NosvedApp", "Unexpected error", e)
-                showToast("Unexpected error occurred")
+                showToast("❌ Unexpected error occurred")
             } finally {
                 _isLoading.value = false
             }
         }
     }
+
+    // Add this new optimized method for setting default formats
+    private suspend fun setDefaultFormatsOptimized(info: VideoInfo) {
+        withContext(Dispatchers.Default) {
+            try {
+                val formats = info.formats ?: return@withContext
+
+                // Parallel processing for format selection
+                val audioJob = async {
+                    formats.filter { it.acodec != "none" && it.vcodec == "none" }
+                        .maxByOrNull { it.abr ?: 0 }
+                }
+
+                val videoJob = async {
+                    formats.filter { it.vcodec != "none" && it.acodec == "none" }
+                        .sortedByDescending { it.height ?: 0 }
+                        .find { (it.height ?: 0) in 480..720 }
+                        ?: formats.filter { it.vcodec != "none" && it.acodec == "none" }
+                            .maxByOrNull { it.height ?: 0 }
+                }
+
+                val bestAudio = audioJob.await()
+                val bestVideo = videoJob.await()
+
+                withContext(Dispatchers.Main) {
+                    _selectedAudioFormat.value = bestAudio
+                    _selectedVideoFormat.value = bestVideo
+                }
+            } catch (e: Exception) {
+                Log.e("NosvedApp", "Error setting default formats", e)
+            }
+        }
+    }
+
+    // Add this new method for auto-fetch on paste
+    fun pasteFromClipboard(): String {
+        return try {
+            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            val clipData = clipboard.primaryClip
+            if (clipData != null && clipData.itemCount > 0) {
+                val pastedText = clipData.getItemAt(0).text?.toString() ?: ""
+                _currentUrl.value = pastedText
+
+                // Auto-fetch with improved speed (like Seal)
+                if (pastedText.isNotBlank() && isValidUrlQuick(pastedText)) {
+                    showToast("🔗 URL pasted - fetching info...")
+                    fetchVideoInfo(pastedText)
+                } else if (pastedText.isNotBlank()) {
+                    showToast("⚠️ Invalid URL format")
+                }
+
+                pastedText
+            } else {
+                showToast("📋 Clipboard is empty")
+                ""
+            }
+        } catch (e: Exception) {
+            showToast("❌ Failed to paste from clipboard")
+            ""
+        }
+    }
+
+    // Add this helper method
+    private fun isValidUrlQuick(url: String): Boolean {
+        return (url.startsWith("http://") || url.startsWith("https://")) &&
+                (url.contains("youtube.com") || url.contains("youtu.be") ||
+                        url.contains("instagram.com") || url.contains("tiktok.com") ||
+                        url.contains("twitter.com") || url.contains("facebook.com") ||
+                        url.contains("vimeo.com"))
+    }
+
+    // Update the initialization method
+    private fun initializeYoutubeDLForSpeed() {
+        try {
+            // Optimized system properties for faster execution
+            System.setProperty("youtubedl.timeout", "3")
+            System.setProperty("youtubedl.retries", "1")
+            System.setProperty("youtubedl.concurrent_fragments", "2")
+            System.setProperty("java.net.useSystemProxies", "false")
+        } catch (e: Exception) {
+            Log.w("NosvedApp", "Failed to set system properties", e)
+        }
+    }
+
 
     private suspend fun setDefaultFormats(info: VideoInfo) {
         withContext(Dispatchers.Default) {

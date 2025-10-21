@@ -246,6 +246,86 @@ fun MainContent(viewModel: MainViewModel) {
 }
 
 @Composable
+private fun EnhancedLoadingIndicator(
+    isLoading: Boolean,
+    modifier: Modifier = Modifier
+) {
+    if (isLoading) {
+        Card(
+            modifier = modifier.padding(vertical = 16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp),
+                    strokeWidth = 3.dp,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Text(
+                        text = "⚡ Extracting video info...",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Text(
+                        text = "This should take 3-10 seconds",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProgressStatusDisplay(
+    isLoading: Boolean,
+    statusText: String = "Processing URL validation...",
+    progress: Float = 0.7f,
+    modifier: Modifier = Modifier
+) {
+    if (isLoading) {
+        Card(
+            modifier = modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(12.dp)
+            ) {
+                LinearProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier.fillMaxWidth(),
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = statusText,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+        }
+    }
+}
+
+@Composable
 fun DownloadScreen(viewModel: MainViewModel) {
     val currentUrl by viewModel.currentUrl.collectAsState()
     val videoInfo by viewModel.videoInfo.collectAsState()
@@ -259,80 +339,86 @@ fun DownloadScreen(viewModel: MainViewModel) {
             .padding(16.dp)
     ) {
         // URL Input Section with Paste Button
-        Row(
+        Card(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
         ) {
-            OutlinedTextField(
-                value = currentUrl,
-                onValueChange = { viewModel.updateUrl(it) },
-                label = { Text("Enter URL") },
-                placeholder = { Text("Paste video URL here...") },
-                modifier = Modifier.weight(1f),
-                leadingIcon = {
-                    Icon(Icons.Default.Link, contentDescription = null)
-                },
-                trailingIcon = {
-                    if (currentUrl.isNotEmpty()) {
-                        IconButton(onClick = { viewModel.clearUrl() }) {
-                            Icon(Icons.Default.Clear, contentDescription = "Clear")
-                        }
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedTextField(
+                        value = currentUrl,
+                        onValueChange = { viewModel.updateUrl(it) },
+                        label = { Text("Enter Video URL") },
+                        placeholder = { Text("Paste YouTube, Instagram, TikTok URL...") },
+                        modifier = Modifier.weight(1f),
+                        leadingIcon = {
+                            Icon(Icons.Default.Link, contentDescription = null)
+                        },
+                        trailingIcon = {
+                            if (currentUrl.isNotEmpty()) {
+                                IconButton(onClick = { viewModel.clearUrl() }) {
+                                    Icon(Icons.Default.Clear, contentDescription = "Clear")
+                                }
+                            }
+                        },
+                        singleLine = true
+                    )
+
+                    // Paste Button
+                    OutlinedButton(
+                        onClick = { viewModel.pasteFromClipboard() },
+                        modifier = Modifier.height(56.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ContentPaste,
+                            contentDescription = "Paste",
+                            modifier = Modifier.size(20.dp)
+                        )
                     }
                 }
-            )
 
-            // Paste Button
-            OutlinedButton(
-                onClick = { viewModel.pasteFromClipboard() },
-                modifier = Modifier.height(56.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.ContentPaste,
-                    contentDescription = "Paste",
-                    modifier = Modifier.size(20.dp)
-                )
+                // Enhanced Search Button
+                Button(
+                    onClick = { viewModel.fetchVideoInfo(currentUrl) },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !isLoading && currentUrl.isNotBlank(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isLoading) MaterialTheme.colorScheme.surfaceVariant
+                        else MaterialTheme.colorScheme.primary
+                    )
+                ) {
+                    if (isLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Extracting Info...")
+                    } else {
+                        Icon(Icons.Default.Search, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Search Video")
+                    }
+                }
             }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Search Button
-        Button(
-            onClick = { viewModel.fetchVideoInfo(currentUrl) },
-            modifier = Modifier.fillMaxWidth(),
-            enabled = !isLoading && currentUrl.isNotBlank()
-        ) {
-            if (isLoading) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(16.dp),
-                    color = MaterialTheme.colorScheme.onPrimary
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Searching...")
-            } else {
-                Icon(Icons.Default.Search, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Search Video")
-            }
-        }
-
-        // Loading State
-        if (isLoading) {
-            Spacer(modifier = Modifier.height(32.dp))
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                CircularProgressIndicator()
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    "Fetching video information...",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
+        // Enhanced Loading State
+        EnhancedLoadingIndicator(
+            isLoading = isLoading,
+            modifier = Modifier.fillMaxWidth()
+        )
 
         // Video Info Card with proper scrollable content
         videoInfo?.let {
@@ -350,6 +436,43 @@ fun DownloadScreen(viewModel: MainViewModel) {
                         viewModel.downloadVideo(it, vFormat, aFormat)
                     }
                 )
+            }
+        }
+
+        // Show helpful message when not loading and no video info
+        if (!isLoading && videoInfo == null && currentUrl.isBlank()) {
+            Spacer(modifier = Modifier.height(32.dp))
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f)
+                )
+            ) {
+                Column(
+                    modifier = Modifier.padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.VideoLibrary,
+                        contentDescription = null,
+                        modifier = Modifier.size(48.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "Welcome to Nosved!",
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Paste a video URL above to get started.\nSupports YouTube, Instagram, TikTok, and more!",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f),
+                        textAlign = TextAlign.Center
+                    )
+                }
             }
         }
     }
@@ -399,17 +522,35 @@ fun VideoInfoCard(
                         textAlign = TextAlign.Start
                     )
 
-                    Text(
-                        text = "Uploader: ${videoInfo.uploader ?: "Unknown"}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                text = "📺 ${videoInfo.uploader ?: "Unknown"}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
 
-                    Text(
-                        text = "Duration: ${formatDuration(videoInfo.duration)}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                            Text(
+                                text = "⏱️ ${formatDuration(videoInfo.duration)}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        // View count or additional info
+                        videoInfo.viewCount?.let { views ->
+                            Text(
+                                text = "👁️ ${formatViewCount(views)}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
                 }
             }
 
@@ -419,39 +560,42 @@ fun VideoInfoCard(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Text(
-                        text = "Quality Selection",
+                        text = "🎬 Quality Selection",
                         style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.primary
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.SemiBold
                     )
 
                     val videoFormats = videoInfo.formats
                         ?.filter { it.vcodec != "none" && it.acodec == "none" }
+                        ?.sortedByDescending { it.height ?: 0 }
                         ?: emptyList()
                     val audioFormats = videoInfo.formats
                         ?.filter { it.acodec != "none" && it.vcodec == "none" }
+                        ?.sortedByDescending { it.abr ?: 0 }
                         ?: emptyList()
 
                     // Video Quality Dropdown
                     QualityDropdown(
                         modifier = Modifier.fillMaxWidth(),
-                        label = "Video Quality",
+                        label = "📹 Video Quality",
                         items = videoFormats,
                         selectedItem = selectedVideoFormat,
                         onItemSelected = onVideoFormatSelected,
                         itemLabel = { format ->
-                            "${format.height ?: "?"}p${format.fps?.let { "/$it" } ?: ""} (${format.getFormattedFileSize()})"
+                            "${format.height ?: "?"}p${format.fps?.let { "@${it}fps" } ?: ""}"
                         }
                     )
 
                     // Audio Quality Dropdown
                     QualityDropdown(
                         modifier = Modifier.fillMaxWidth(),
-                        label = "Audio Quality",
+                        label = "🎵 Audio Quality",
                         items = audioFormats,
                         selectedItem = selectedAudioFormat,
                         onItemSelected = onAudioFormatSelected,
                         itemLabel = { format ->
-                            "${format.abr ?: "?"}kbps (${format.getFormattedFileSize()})"
+                            "${format.abr ?: "?"}kbps"
                         }
                     )
                 }
@@ -467,8 +611,11 @@ fun VideoInfoCard(
                     },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(48.dp),
-                    enabled = selectedVideoFormat != null && selectedAudioFormat != null
+                        .height(56.dp),
+                    enabled = selectedVideoFormat != null && selectedAudioFormat != null,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary
+                    )
                 ) {
                     Icon(
                         imageVector = Icons.Default.Download,
@@ -509,7 +656,7 @@ fun <T> QualityDropdown(
         modifier = modifier
     ) {
         OutlinedTextField(
-            value = selectedItem?.let { itemLabel(it) } ?: "",
+            value = selectedItem?.let { itemLabel(it) } ?: "Select quality...",
             onValueChange = {},
             readOnly = true,
             label = { Text(label) },
@@ -519,7 +666,11 @@ fun <T> QualityDropdown(
             modifier = Modifier
                 .fillMaxWidth()
                 .menuAnchor(),
-            singleLine = true
+            singleLine = true,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = MaterialTheme.colorScheme.outline
+            )
         )
 
         ExposedDropdownMenu(
@@ -557,5 +708,22 @@ private fun formatDuration(duration: Int?): String {
     return when {
         hours > 0 -> String.format("%d:%02d:%02d", hours, minutes, seconds)
         else -> String.format("%d:%02d", minutes, seconds)
+    }
+}
+
+// Helper function to format view count
+// Helper function to format view count
+private fun formatViewCount(count: Any?): String {
+    val viewCount = when (count) {
+        is Long -> count
+        is Int -> count.toLong()
+        is String -> count.toLongOrNull() ?: 0L
+        else -> 0L
+    }
+
+    return when {
+        viewCount >= 1_000_000 -> String.format("%.1fM", viewCount / 1_000_000.0)
+        viewCount >= 1_000 -> String.format("%.1fK", viewCount / 1_000.0)
+        else -> viewCount.toString()
     }
 }

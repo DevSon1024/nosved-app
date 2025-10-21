@@ -134,6 +134,14 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
+    // Add these for better performance
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
+
+// Network optimization
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+
     // Testing
     implementation("com.tencent:mmkv:1.3.9")
     testImplementation("junit:junit:4.13.2")
