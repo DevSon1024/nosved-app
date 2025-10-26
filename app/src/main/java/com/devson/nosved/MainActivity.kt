@@ -38,6 +38,12 @@ import com.yausername.youtubedl_android.YoutubeDL
 import com.yausername.youtubedl_android.YoutubeDLException
 import com.yausername.youtubedl_android.mapper.VideoFormat
 import com.yausername.youtubedl_android.mapper.VideoInfo
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material.icons.filled.Tune
+import com.devson.nosved.ui.FormatSelectionSheet
+
 
 class MainActivity : ComponentActivity() {
 
@@ -488,6 +494,9 @@ fun VideoInfoCard(
     onAudioFormatSelected: (VideoFormat) -> Unit,
     onDownloadClicked: (VideoFormat, VideoFormat) -> Unit
 ) {
+    var showFormatSheet by remember { mutableStateOf(false) }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
     Card(
         modifier = Modifier.fillMaxSize(),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
@@ -542,7 +551,6 @@ fun VideoInfoCard(
                             )
                         }
 
-                        // View count or additional info
                         videoInfo.viewCount?.let { views ->
                             Text(
                                 text = "👁️ ${formatViewCount(views)}",
@@ -554,50 +562,53 @@ fun VideoInfoCard(
                 }
             }
 
-            // Quality Selection Section
+            // Current Selection Display (like Seal)
             item {
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                    )
                 ) {
-                    Text(
-                        text = "🎬 Quality Selection",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.SemiBold
-                    )
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = "Current Selection:",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Medium
+                        )
 
-                    val videoFormats = videoInfo.formats
-                        ?.filter { it.vcodec != "none" && it.acodec == "none" }
-                        ?.sortedByDescending { it.height ?: 0 }
-                        ?: emptyList()
-                    val audioFormats = videoInfo.formats
-                        ?.filter { it.acodec != "none" && it.vcodec == "none" }
-                        ?.sortedByDescending { it.abr ?: 0 }
-                        ?: emptyList()
-
-                    // Video Quality Dropdown
-                    QualityDropdown(
-                        modifier = Modifier.fillMaxWidth(),
-                        label = "📹 Video Quality",
-                        items = videoFormats,
-                        selectedItem = selectedVideoFormat,
-                        onItemSelected = onVideoFormatSelected,
-                        itemLabel = { format ->
-                            "${format.height ?: "?"}p${format.fps?.let { "@${it}fps" } ?: ""}"
+                        if (selectedVideoFormat != null && selectedAudioFormat != null) {
+                            Text(
+                                text = "📹 ${selectedVideoFormat.height ?: "?"}p (${selectedVideoFormat.ext?.uppercase() ?: ""})",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Text(
+                                text = "🎵 ${selectedAudioFormat.abr ?: "?"}kbps (${selectedAudioFormat.ext?.uppercase() ?: ""})",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        } else {
+                            Text(
+                                text = "No formats selected",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
-                    )
+                    }
+                }
+            }
 
-                    // Audio Quality Dropdown
-                    QualityDropdown(
-                        modifier = Modifier.fillMaxWidth(),
-                        label = "🎵 Audio Quality",
-                        items = audioFormats,
-                        selectedItem = selectedAudioFormat,
-                        onItemSelected = onAudioFormatSelected,
-                        itemLabel = { format ->
-                            "${format.abr ?: "?"}kbps"
-                        }
-                    )
+            // Format Selection Button (like Seal's "Format selection")
+            item {
+                OutlinedButton(
+                    onClick = { showFormatSheet = true },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.Tune, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Format selection")
                 }
             }
 
@@ -624,16 +635,45 @@ fun VideoInfoCard(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Download Video",
+                        text = "Download",
                         style = MaterialTheme.typography.titleMedium
                     )
                 }
             }
 
-            // Add some bottom padding to ensure the download button is fully visible
             item {
                 Spacer(modifier = Modifier.height(16.dp))
             }
+        }
+    }
+
+    // Format Selection Sheet (like Seal)
+    if (showFormatSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showFormatSheet = false },
+            sheetState = sheetState,
+            modifier = Modifier.fillMaxHeight(0.9f)
+        ) {
+            val formats: List<VideoFormat> = videoInfo.formats ?: emptyList()
+            FormatSelectionSheet(
+                title = videoInfo.title ?: "Unknown Title",
+                thumbnailUrl = videoInfo.thumbnail,
+                formats = formats,
+                selectedVideo = selectedVideoFormat,
+                selectedAudio = selectedAudioFormat,
+                onSelectVideo = onVideoFormatSelected,
+                onSelectAudio = onAudioFormatSelected,
+                onSelectSuggested = { video, audio ->
+                    onVideoFormatSelected(video)
+                    onAudioFormatSelected(audio)
+                },
+                onDownload = {
+                    if (selectedVideoFormat != null && selectedAudioFormat != null) {
+                        onDownloadClicked(selectedVideoFormat, selectedAudioFormat)
+                        showFormatSheet = false
+                    }
+                }
+            )
         }
     }
 }

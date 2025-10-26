@@ -58,8 +58,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         notificationHelper.createNotificationChannel()
-        // Initialize YoutubeDL with minimal settings for speed
-        initializeYoutubeDLForSpeed()
+        initializeYoutubeDLLikeSeal() // New method
+        clearYoutubeDLCache() // Clear cache on startup
     }
 
     fun updateUrl(url: String) {
@@ -211,45 +211,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         url.contains("vimeo.com"))
     }
 
-    // Update the initialization method
-    private fun initializeYoutubeDLForSpeed() {
-        try {
-            // Optimized system properties for faster execution
-            System.setProperty("youtubedl.timeout", "3")
-            System.setProperty("youtubedl.retries", "1")
-            System.setProperty("youtubedl.concurrent_fragments", "2")
-            System.setProperty("java.net.useSystemProxies", "false")
-        } catch (e: Exception) {
-            Log.w("NosvedApp", "Failed to set system properties", e)
-        }
-    }
-
-
-    private suspend fun setDefaultFormats(info: VideoInfo) {
-        withContext(Dispatchers.Default) {
-            try {
-                // Set best audio format
-                val bestAudioFormat = info.formats
-                    ?.filter { it.acodec != "none" && it.vcodec == "none" }
-                    ?.maxByOrNull { it.abr ?: 0 }
-
-                // Set best video format (720p or best available)
-                val bestVideoFormat = info.formats
-                    ?.filter { it.vcodec != "none" && it.acodec == "none" }
-                    ?.sortedByDescending { it.height ?: 0 }
-                    ?.firstOrNull { (it.height ?: 0) <= 720 }
-                    ?: info.formats?.filter { it.vcodec != "none" && it.acodec == "none" }?.firstOrNull()
-
-                withContext(Dispatchers.Main) {
-                    _selectedAudioFormat.value = bestAudioFormat
-                    _selectedVideoFormat.value = bestVideoFormat
-                }
-            } catch (e: Exception) {
-                Log.e("NosvedApp", "Error setting default formats", e)
-            }
-        }
-    }
-
     fun selectVideoFormat(format: VideoFormat) {
         _selectedVideoFormat.value = format
     }
@@ -290,6 +251,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     ) {
         withContext(Dispatchers.IO) {
             try {
+                // Clear cache before download
+                clearYoutubeDLCache()
+
                 downloadDao.updateDownloadStatus(downloadId, DownloadStatus.DOWNLOADING)
 
                 val downloadDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
@@ -299,61 +263,109 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
 
                 val sanitizedTitle = videoInfo.title?.replace("[^a-zA-Z0-9.-]".toRegex(), "_") ?: "video"
-                val fileName = "${sanitizedTitle}.mp4"
-                val filePath = File(nosvedDir, fileName)
+                val fileName = "${sanitizedTitle}.%(ext)s"
+                val filePath = File(nosvedDir, "${sanitizedTitle}.mp4")
 
                 val request = videoInfo.webpageUrl?.let { YoutubeDLRequest(it) }
-                request?.addOption("-o", filePath.absolutePath.replace(".mp4", ".%(ext)s"))
-                request?.addOption("-f", "${videoFormat.formatId}+${audioFormat.formatId}")
-                request?.addOption("--merge-output-format", "mp4")
 
-                // Optimized download settings
-                request?.addOption("--no-mtime")
-                request?.addOption("--concurrent-fragments", "8")
-                request?.addOption("--fragment-retries", "3")
-                request?.addOption("--socket-timeout", "10")
-                request?.addOption("--retries", "3")
+                // CORRECTED: Remove invalid options and use only supported ones
+                request?.apply {
+                    addOption("-o", File(nosvedDir, fileName).absolutePath)
+                    addOption("-f", "${videoFormat.formatId}+${audioFormat.formatId}/best")
+                    addOption("--merge-output-format", "mp4")
 
-                if (request != null) {
-                    YoutubeDL.getInstance().execute(request) { progress, _, line ->
-                        Log.d("NosvedApp", "Download progress: $progress% - $line")
+                    // ONLY use supported options for your version
+                    addOption("--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                    addOption("--referer", "https://www.youtube.com/")
 
-                        viewModelScope.launch {
-                            val progressData = DownloadProgress(
-                                id = downloadId,
-                                progress = progress.toInt(),
-                                downloadedSize = 0L,
-                                totalSize = videoFormat.fileSize ?: 0L,
-                                speed = extractSpeed(line),
-                                eta = extractETA(line)
-                            )
+                    // Performance options (these are widely supported)
+                    addOption("--no-warnings")
+                    addOption("--socket-timeout", "10")
+                    addOption("--retries", "3")
+                    addOption("--fragment-retries", "3")
 
-                            _downloadProgress.value = _downloadProgress.value + (downloadId to progressData)
-                            downloadDao.updateDownloadProgress(downloadId, progress.toInt(), 0L)
-                            notificationHelper.showDownloadProgressNotification(line)
-                        }
-                    }
-
-                    downloadDao.updateDownload(
-                        downloadDao.getDownloadById(downloadId)?.copy(
-                            status = DownloadStatus.COMPLETED,
-                            filePath = filePath.absolutePath,
-                            fileName = fileName,
-                            completedAt = System.currentTimeMillis(),
-                            progress = 100
-                        ) ?: return@withContext
-                    )
-
-                    showToast("Download completed: ${videoInfo.title}")
-                    notificationHelper.showDownloadCompleteNotification(
-                        videoInfo.title ?: "Unknown Title",
-                        filePath.absolutePath
-                    )
+                    // REMOVED these problematic options:
+                    // addOption("--extract-flat", "false")  // ❌ This caused the error
+                    // addOption("--no-cache-dir")          // ❌ May not be supported
+                    // addOption("--concurrent-fragments", "4") // ❌ May cause issues
                 }
 
-            } catch (e: YoutubeDLException) {
-                Log.e("NosvedApp", "Failed to download video", e)
-                showToast("Download failed: ${videoInfo.title}")
+                if (request != null) {
+                    try {
+                        YoutubeDL.getInstance().execute(request) { progress, _, line ->
+                            Log.d("NosvedApp", "Download progress: $progress% - $line")
+
+                            viewModelScope.launch {
+                                val progressData = DownloadProgress(
+                                    id = downloadId,
+                                    progress = if (progress > 0) progress.toInt() else 0,
+                                    downloadedSize = 0L,
+                                    totalSize = videoFormat.fileSize ?: 0L,
+                                    speed = extractSpeed(line),
+                                    eta = extractETA(line)
+                                )
+
+                                _downloadProgress.value = _downloadProgress.value + (downloadId to progressData)
+                                downloadDao.updateDownloadProgress(downloadId, progressData.progress, 0L)
+                                notificationHelper.showDownloadProgressNotification(line)
+                            }
+                        }
+
+                        // Success
+                        downloadDao.updateDownload(
+                            downloadDao.getDownloadById(downloadId)?.copy(
+                                status = DownloadStatus.COMPLETED,
+                                filePath = filePath.absolutePath,
+                                fileName = fileName.replace(".%(ext)s", ".mp4"),
+                                completedAt = System.currentTimeMillis(),
+                                progress = 100
+                            ) ?: return@withContext
+                        )
+
+                        showToast("✅ Download completed: ${videoInfo.title}")
+                        notificationHelper.showDownloadCompleteNotification(
+                            videoInfo.title ?: "Unknown Title",
+                            filePath.absolutePath
+                        )
+
+                    } catch (e: YoutubeDLException) {
+                        // Handle specific errors
+                        when {
+                            e.message?.contains("403") == true -> {
+                                Log.w("NosvedApp", "403 error, trying simple download...")
+
+                                // Fallback to simplest possible request
+                                val simpleRequest = YoutubeDLRequest(videoInfo.webpageUrl!!)
+                                simpleRequest.addOption("-o", File(nosvedDir, fileName).absolutePath)
+                                simpleRequest.addOption("-f", "best")
+
+                                try {
+                                    YoutubeDL.getInstance().execute(simpleRequest)
+                                    showToast("✅ Download completed (simple mode): ${videoInfo.title}")
+                                } catch (retryError: Exception) {
+                                    throw retryError
+                                }
+                            }
+                            e.message?.contains("no such option") == true -> {
+                                showToast("❌ Incompatible download options - updating needed")
+                                throw e
+                            }
+                            else -> throw e
+                        }
+                    }
+                }
+
+            } catch (e: Exception) {
+                Log.e("NosvedApp", "Failed to download video (${videoInfo.title})", e)
+
+                val errorMessage = when {
+                    e.message?.contains("no such option") == true -> "❌ App needs update for this feature"
+                    e.message?.contains("403") == true -> "❌ Access blocked - Try again later"
+                    e.message?.contains("network") == true -> "❌ Network error"
+                    else -> "❌ Download failed: ${e.message?.take(50)}"
+                }
+
+                showToast(errorMessage)
 
                 downloadDao.updateDownload(
                     downloadDao.getDownloadById(downloadId)?.copy(
@@ -419,6 +431,34 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val speedRegex = "([0-9.]+[KMG]iB/s)".toRegex()
         return speedRegex.find(line)?.value ?: ""
     }
+
+    private fun initializeYoutubeDLLikeSeal() {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                // Update youtube-dl on app start
+                YoutubeDL.getInstance().updateYoutubeDL(context)
+                Log.d("NosvedApp", "YoutubeDL updated successfully")
+            } catch (e: Exception) {
+                Log.w("NosvedApp", "Failed to update YoutubeDL", e)
+            }
+        }
+    }
+
+    private fun clearYoutubeDLCache() {
+        try {
+            YoutubeDL.getInstance().run {
+                // Clear cache directory
+                val cacheDir = File(context.cacheDir, "youtube-dl")
+                if (cacheDir.exists()) {
+                    cacheDir.deleteRecursively()
+                }
+            }
+            Log.d("NosvedApp", "YoutubeDL cache cleared")
+        } catch (e: Exception) {
+            Log.e("NosvedApp", "Failed to clear cache", e)
+        }
+    }
+
 
     private fun extractETA(line: String): String {
         val etaRegex = "ETA ([0-9:]+)".toRegex()
