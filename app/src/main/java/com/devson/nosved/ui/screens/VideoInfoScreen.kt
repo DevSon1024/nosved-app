@@ -22,7 +22,6 @@ import com.devson.nosved.data.QualityPreferences
 import com.devson.nosved.ui.components.QualitySelectionDialog
 import com.devson.nosved.ui.FormatSelectionSheet
 import com.yausername.youtubedl_android.mapper.VideoFormat
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun VideoInfoScreen(

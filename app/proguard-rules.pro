@@ -74,3 +74,7 @@
 # Keep line numbers for debugging
 -keepattributes SourceFile,LineNumberTable
 -renamesourcefileattribute SourceFile
+
+# Reduce APK size
+-repackageclasses ''
+-allowaccessmodification

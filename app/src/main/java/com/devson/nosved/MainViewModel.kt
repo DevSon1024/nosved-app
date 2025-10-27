@@ -262,6 +262,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun downloadVideo(videoInfo: VideoInfo, videoFormat: VideoFormat, audioFormat: VideoFormat) {
         viewModelScope.launch (Dispatchers.IO){
             val downloadId = UUID.randomUUID().toString()
+            // Calculate the total size
+            val totalSize = (videoFormat.fileSize ?: 0L) + (audioFormat.fileSize ?: 0L)
+
             val downloadEntity = DownloadEntity(
                 id = downloadId,
                 title = videoInfo.title ?: "Unknown Title",
@@ -269,6 +272,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 thumbnail = videoInfo.thumbnail,
                 filePath = null,
                 fileName = null,
+                fileSize = if (totalSize > 0) totalSize else 0L,
                 status = DownloadStatus.QUEUED,
                 duration = videoInfo.duration?.toString(),
                 uploader = videoInfo.uploader,
@@ -356,6 +360,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             thumbnail = videoInfo.thumbnail,
             filePath = null,
             fileName = null,
+            fileSize = audioFormat.fileSize ?: 0L,
             status = DownloadStatus.QUEUED,
             duration = videoInfo.duration?.toString(),
             uploader = videoInfo.uploader,
