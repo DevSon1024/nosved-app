@@ -178,7 +178,7 @@ fun HomeScreen(
                         FeatureItem(
                             icon = "📱",
                             title = "Quick Paste",
-                            description = "Use floating paste button or quick download"
+                            description = "Use floating paste button or quick button at center for direct Download"
                         )
                     }
                 }

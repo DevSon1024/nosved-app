@@ -11,11 +11,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.devson.nosved.MainViewModel
+import com.devson.nosved.data.DownloadMode
+import com.devson.nosved.data.QualityPreferences
+import com.devson.nosved.ui.components.QualitySelectionDialog
 import com.devson.nosved.ui.FormatSelectionSheet
 import com.yausername.youtubedl_android.mapper.VideoFormat
 
@@ -26,11 +30,28 @@ fun VideoInfoScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    val qualityPrefs = remember { QualityPreferences(context) }
+
     val videoInfo by viewModel.videoInfo.collectAsState()
     val selectedVideoFormat by viewModel.selectedVideoFormat.collectAsState()
     val selectedAudioFormat by viewModel.selectedAudioFormat.collectAsState()
-    var showFormatSheet by remember { mutableStateOf(false) }
+
+    var showQualityDialog by remember { mutableStateOf(false) }
+    var showAdvancedSheet by remember { mutableStateOf(false) }
+    var selectedDownloadMode by remember { mutableStateOf(DownloadMode.VIDEO_AUDIO) }
+
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    // Collect quality preferences
+    val defaultVideoQuality by qualityPrefs.videoQuality.collectAsState(initial = "720p")
+    val defaultAudioQuality by qualityPrefs.audioQuality.collectAsState(initial = "128kbps")
+    val downloadMode by qualityPrefs.downloadMode.collectAsState(initial = DownloadMode.VIDEO_AUDIO)
+
+    // Update local state when preferences change
+    LaunchedEffect(downloadMode) {
+        selectedDownloadMode = downloadMode
+    }
 
     // If no video info, go back
     LaunchedEffect(videoInfo) {
@@ -135,12 +156,8 @@ fun VideoInfoScreen(
                     }
                 }
 
-                // Current Selection Card
+                // Quality Selection Card (New Seal-like interface)
                 item {
-                    // Fix: Store format values in local variables to avoid smart cast issues
-                    val currentVideoFormat = selectedVideoFormat
-                    val currentAudioFormat = selectedAudioFormat
-
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.cardColors(
@@ -163,96 +180,109 @@ fun VideoInfoScreen(
                                 )
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Text(
-                                    text = "Quality Selection",
+                                    text = "Download Quality",
                                     style = MaterialTheme.typography.titleLarge,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onPrimaryContainer
                                 )
                             }
 
-                            if (currentVideoFormat != null && currentAudioFormat != null) {
+                            // Download Mode Selection
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                // Video + Audio Button
+                                ElevatedFilterChip(
+                                    selected = selectedDownloadMode == DownloadMode.VIDEO_AUDIO,
+                                    onClick = { selectedDownloadMode = DownloadMode.VIDEO_AUDIO },
+                                    label = { Text("Video + Audio") },
+                                    modifier = Modifier.weight(1f)
+                                )
+
+                                // Audio Only Button
+                                ElevatedFilterChip(
+                                    selected = selectedDownloadMode == DownloadMode.AUDIO_ONLY,
+                                    onClick = { selectedDownloadMode = DownloadMode.AUDIO_ONLY },
+                                    label = { Text("Audio Only") },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+
+                            // Show current selection preview
+                            if (selectedDownloadMode == DownloadMode.VIDEO_AUDIO) {
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                                 ) {
-                                    // Video Quality
+                                    // Video Quality Preview
                                     Card(
+                                        modifier = Modifier.weight(1f),
                                         colors = CardDefaults.cardColors(
-                                            containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                                            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f)
                                         )
                                     ) {
                                         Column(
-                                            modifier = Modifier.padding(16.dp),
+                                            modifier = Modifier.padding(12.dp),
                                             horizontalAlignment = Alignment.CenterHorizontally
                                         ) {
                                             Text(
                                                 text = "📹 Video",
                                                 style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                                             )
                                             Text(
-                                                text = "${currentVideoFormat.height ?: "?"}p",
-                                                style = MaterialTheme.typography.titleLarge,
-                                                fontWeight = FontWeight.Bold,
-                                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                                            )
-                                            Text(
-                                                text = currentVideoFormat.ext?.uppercase() ?: "?",
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                                                text = defaultVideoQuality,
+                                                style = MaterialTheme.typography.titleMedium,
+                                                fontWeight = FontWeight.Bold
                                             )
                                         }
                                     }
 
-                                    // Audio Quality
+                                    // Audio Quality Preview
                                     Card(
+                                        modifier = Modifier.weight(1f),
                                         colors = CardDefaults.cardColors(
-                                            containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                                            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f)
                                         )
                                     ) {
                                         Column(
-                                            modifier = Modifier.padding(16.dp),
+                                            modifier = Modifier.padding(12.dp),
                                             horizontalAlignment = Alignment.CenterHorizontally
                                         ) {
                                             Text(
                                                 text = "🎵 Audio",
                                                 style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                                             )
                                             Text(
-                                                text = "${currentAudioFormat.abr ?: "?"}kbps",
-                                                style = MaterialTheme.typography.titleLarge,
-                                                fontWeight = FontWeight.Bold,
-                                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                                            )
-                                            Text(
-                                                text = currentAudioFormat.ext?.uppercase() ?: "?",
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                                                text = defaultAudioQuality,
+                                                style = MaterialTheme.typography.titleMedium,
+                                                fontWeight = FontWeight.Bold
                                             )
                                         }
                                     }
                                 }
                             } else {
                                 Card(
+                                    modifier = Modifier.fillMaxWidth(),
                                     colors = CardDefaults.cardColors(
-                                        containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
+                                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f)
                                     )
                                 ) {
-                                    Row(
-                                        modifier = Modifier.padding(16.dp),
-                                        verticalAlignment = Alignment.CenterVertically
+                                    Column(
+                                        modifier = Modifier.padding(12.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally
                                     ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Warning,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.error
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
                                         Text(
-                                            text = "No formats selected - Please choose quality settings",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onErrorContainer
+                                            text = "🎵 Audio Only",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                                        )
+                                        Text(
+                                            text = defaultAudioQuality,
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold
                                         )
                                     }
                                 }
@@ -264,7 +294,7 @@ fun VideoInfoScreen(
                 item { Spacer(modifier = Modifier.height(100.dp)) }
             }
 
-            // Bottom Action Buttons (Fixed at bottom)
+            // Bottom Action Buttons
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 color = MaterialTheme.colorScheme.surface,
@@ -274,38 +304,33 @@ fun VideoInfoScreen(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    // Format Selection Button
+                    // Quality Settings Button
                     OutlinedButton(
-                        onClick = { showFormatSheet = true },
+                        onClick = { showQualityDialog = true },
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Icon(Icons.Default.Tune, contentDescription = null)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Change Quality Settings",
-                            style = MaterialTheme.typography.titleMedium
-                        )
+                        Text("Change Quality Settings")
                     }
 
-                    // Download Button - Fix: Use local variables
-                    val currentVideoFormat = selectedVideoFormat
-                    val currentAudioFormat = selectedAudioFormat
-                    val isDownloadEnabled = currentVideoFormat != null && currentAudioFormat != null
-
+                    // Download Button
                     Button(
                         onClick = {
-                            if (isDownloadEnabled) {
-                                viewModel.downloadVideo(info, currentVideoFormat!!, currentAudioFormat!!)
-                                onBack() // Go back after starting download
-                            }
+                            // Use smart format selection based on mode and preferences
+                            viewModel.downloadVideoWithQuality(
+                                videoInfo = info,
+                                downloadMode = selectedDownloadMode,
+                                preferredVideoQuality = defaultVideoQuality,
+                                preferredAudioQuality = defaultAudioQuality
+                            )
+                            onBack()
                         },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(56.dp),
-                        enabled = isDownloadEnabled,
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant
+                            containerColor = MaterialTheme.colorScheme.primary
                         )
                     ) {
                         Icon(
@@ -315,8 +340,7 @@ fun VideoInfoScreen(
                         )
                         Spacer(modifier = Modifier.width(12.dp))
                         Text(
-                            text = if (isDownloadEnabled)
-                                "Download Video" else "Select Quality First",
+                            text = "Download ${if (selectedDownloadMode == DownloadMode.AUDIO_ONLY) "Audio" else "Video"}",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
@@ -325,25 +349,34 @@ fun VideoInfoScreen(
             }
         }
 
-        // Format Selection Sheet
-        if (showFormatSheet) {
+        // Quality Selection Dialog
+        if (showQualityDialog) {
+            QualitySelectionDialog(
+                currentMode = selectedDownloadMode,
+                onModeChange = { selectedDownloadMode = it },
+                onAdvancedClick = {
+                    showQualityDialog = false
+                    showAdvancedSheet = true
+                },
+                onDismiss = { showQualityDialog = false }
+            )
+        }
+
+        // Advanced Format Selection Sheet (Original)
+        if (showAdvancedSheet) {
             ModalBottomSheet(
-                onDismissRequest = { showFormatSheet = false },
+                onDismissRequest = { showAdvancedSheet = false },
                 sheetState = sheetState,
                 modifier = Modifier.fillMaxHeight(0.9f)
             ) {
                 val formats: List<VideoFormat> = info.formats ?: emptyList()
 
-                // Fix: Use local variables for the sheet as well
-                val currentVideoFormat = selectedVideoFormat
-                val currentAudioFormat = selectedAudioFormat
-
                 FormatSelectionSheet(
                     title = info.title ?: "Unknown Title",
                     thumbnailUrl = info.thumbnail,
                     formats = formats,
-                    selectedVideo = currentVideoFormat,
-                    selectedAudio = currentAudioFormat,
+                    selectedVideo = selectedVideoFormat,
+                    selectedAudio = selectedAudioFormat,
                     onSelectVideo = { format -> viewModel.selectVideoFormat(format) },
                     onSelectAudio = { format -> viewModel.selectAudioFormat(format) },
                     onSelectSuggested = { video, audio ->
@@ -355,8 +388,8 @@ fun VideoInfoScreen(
                         val audioFormat = selectedAudioFormat
                         if (videoFormat != null && audioFormat != null) {
                             viewModel.downloadVideo(info, videoFormat, audioFormat)
-                            showFormatSheet = false
-                            onBack() // Go back after starting download
+                            showAdvancedSheet = false
+                            onBack()
                         }
                     }
                 )
@@ -365,7 +398,7 @@ fun VideoInfoScreen(
     }
 }
 
-// Helper functions
+// Helper functions remain the same...
 private fun formatDuration(duration: Int?): String {
     if (duration == null) return "Unknown"
 

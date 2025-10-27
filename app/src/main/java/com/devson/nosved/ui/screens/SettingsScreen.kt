@@ -15,6 +15,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import java.io.File
+import com.devson.nosved.data.*
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -58,23 +60,45 @@ fun SettingsScreen(
             }
 
             item {
+                val context = LocalContext.current
+                val qualityPrefs = remember { QualityPreferences(context) }
+                val defaultVideoQuality by qualityPrefs.videoQuality.collectAsState(initial = "720p")
+
                 SettingsItem(
                     icon = Icons.Default.HighQuality,
                     title = "Default Video Quality",
-                    subtitle = "720p (HD)",
+                    subtitle = defaultVideoQuality,
                     onClick = {
-                        // TODO: Implement quality selection
+                        // Open quality selection dialog
                     }
                 )
             }
 
             item {
+                val context = LocalContext.current
+                val qualityPrefs = remember { QualityPreferences(context) }
+                val defaultAudioQuality by qualityPrefs.audioQuality.collectAsState(initial = "128kbps")
+
                 SettingsItem(
                     icon = Icons.Default.AudioFile,
                     title = "Default Audio Quality",
-                    subtitle = "128kbps",
+                    subtitle = defaultAudioQuality,
                     onClick = {
-                        // TODO: Implement audio quality selection
+                        // Open audio quality selection
+                    }
+                )
+            }
+            item {
+                val context = LocalContext.current
+                val qualityPrefs = remember { QualityPreferences(context) }
+                val downloadMode by qualityPrefs.downloadMode.collectAsState(initial = DownloadMode.VIDEO_AUDIO)
+
+                SettingsItem(
+                    icon = Icons.Default.Download,
+                    title = "Default Download Mode",
+                    subtitle = if (downloadMode == DownloadMode.AUDIO_ONLY) "Audio Only" else "Video + Audio",
+                    onClick = {
+                        // Open download mode selection
                     }
                 )
             }
