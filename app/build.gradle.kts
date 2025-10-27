@@ -1,8 +1,23 @@
+import java.io.FileInputStream
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     id("kotlin-kapt")
+}
+
+// Keystore configuration
+val keystorePropertiesFile = rootProject.file("keystore.properties")
+val keystoreProperties = Properties()
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+}
+
+// Check if splits should be enabled (disable for debug builds)
+val splitApks = !project.hasProperty("noSplits") && !gradle.startParameter.taskNames.any {
+    it.contains("debug", ignoreCase = true)
 }
 
 android {
@@ -19,11 +34,24 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
+
+        // Conditional ABI configuration
+        if (!splitApks) {
+            // For debug builds - only include device ABI for faster builds
+            ndk {
+                abiFilters.add("arm64-v8a")
+            }
+        }
     }
 
     signingConfigs {
         create("release") {
-            // This is a placeholder for your signing configuration.
+            if (keystorePropertiesFile.exists()) {
+                keyAlias = keystoreProperties["keyAlias"] as String?
+                keyPassword = keystoreProperties["keyPassword"] as String?
+                storeFile = file(keystoreProperties["storeFile"] as String)
+                storePassword = keystoreProperties["storePassword"] as String?
+            }
         }
     }
 
@@ -35,7 +63,9 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.getByName("release")
+            if (keystorePropertiesFile.exists()) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
         debug {
             isMinifyEnabled = false
@@ -44,12 +74,15 @@ android {
         }
     }
 
-    splits {
-        abi {
-            isEnable = true
-            reset()
-            include("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
-            isUniversalApk = false
+    // Conditional splits configuration
+    if (splitApks) {
+        splits {
+            abi {
+                isEnable = true
+                reset()
+                include("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
+                isUniversalApk = false
+            }
         }
     }
 
@@ -92,15 +125,19 @@ android {
             excludes += "**/*.version"
             excludes += "**/kotlin-tooling-metadata.json"
         }
-        jniLibs.useLegacyPackaging = true
+        jniLibs {
+            useLegacyPackaging = true
+        }
     }
+
     ndkVersion = "27.0.12077973"
 }
 
-val youtubedlAndroid = "0.18.0"
+// Use optimized youtubedl-android version (same as Seal)
+val youtubedlAndroid = "0.17.3"
 
 dependencies {
-    // YouTubeDL Android
+    // YouTubeDL Android - Optimized version
     implementation("io.github.junkfood02.youtubedl-android:library:${youtubedlAndroid}")
     implementation("io.github.junkfood02.youtubedl-android:ffmpeg:${youtubedlAndroid}")
 
@@ -134,13 +171,12 @@ dependencies {
     // Room Database - Performance optimized
     implementation("androidx.room:room-runtime:2.6.1")
     implementation("androidx.room:room-ktx:2.6.1")
-    implementation("androidx.room:room-paging:2.6.1")
+    // Removed room-paging to reduce size
     kapt("androidx.room:room-compiler:2.6.1")
 
-    // Image Loading - Optimized
+    // Image Loading - Essential only
     implementation("io.coil-kt:coil-compose:2.6.0")
-    implementation("io.coil-kt:coil-gif:2.6.0")
-    implementation("io.coil-kt:coil-svg:2.6.0")
+    // Removed coil-gif and coil-svg to reduce size
 
     // Performance monitoring
     implementation("androidx.compose.runtime:runtime-tracing:1.0.0-beta01")
