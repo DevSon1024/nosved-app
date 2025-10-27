@@ -85,7 +85,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         currentFetchJob?.cancel()
         VideoInfoUtil.cancelFetch(url)
 
-        currentFetchJob = viewModelScope.launch {
+        currentFetchJob = viewModelScope.launch(Dispatchers.IO) {
             _isLoading.value = true
             _videoInfo.value = null
             _selectedVideoFormat.value = null
@@ -215,7 +215,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         preferredAudioContainer: String = "m4a",
         preferredVideoContainer: String = "mp4"
     ) {
-        viewModelScope.launch {
+        viewModelScope.launch (Dispatchers.IO){
             val formats = videoInfo.formats ?: return@launch
 
             val targetVideoHeight = parseQualityFromString(preferredVideoQuality)
@@ -260,7 +260,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // === DOWNLOAD FUNCTIONS ===
 
     fun downloadVideo(videoInfo: VideoInfo, videoFormat: VideoFormat, audioFormat: VideoFormat) {
-        viewModelScope.launch {
+        viewModelScope.launch (Dispatchers.IO){
             val downloadId = UUID.randomUUID().toString()
             val downloadEntity = DownloadEntity(
                 id = downloadId,
@@ -309,7 +309,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 request.addOption("--fragment-retries", "3")
 
                 YoutubeDL.getInstance().execute(request) { progress, _, line ->
-                    viewModelScope.launch {
+                    viewModelScope.launch(Dispatchers.IO) {
                         val progressData = DownloadProgress(
                             id = downloadId,
                             progress = if (progress > 0) progress.toInt() else 0,
@@ -392,7 +392,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 request.addOption("--no-warnings")
 
                 YoutubeDL.getInstance().execute(request) { progress, _, line ->
-                    viewModelScope.launch {
+                    viewModelScope.launch(Dispatchers.IO) {
                         val progressData = DownloadProgress(
                             id = downloadId,
                             progress = if (progress > 0) progress.toInt() else 0,
@@ -485,7 +485,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun cancelDownload(downloadId: String) {
-        viewModelScope.launch {
+        viewModelScope.launch (Dispatchers.IO) {
             val download = downloadDao.getDownloadById(downloadId)
             downloadDao.updateDownloadStatus(downloadId, DownloadStatus.CANCELLED)
             _downloadProgress.value = _downloadProgress.value - downloadId
@@ -494,7 +494,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun retryDownload(downloadId: String) {
-        viewModelScope.launch {
+        viewModelScope.launch (Dispatchers.IO){
             val download = downloadDao.getDownloadById(downloadId)
             if (download != null && download.status == DownloadStatus.FAILED) {
                 downloadDao.updateDownloadStatus(downloadId, DownloadStatus.QUEUED)
@@ -504,7 +504,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun deleteDownload(downloadId: String) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             val download = downloadDao.getDownloadById(downloadId)
             download?.let {
                 it.filePath?.let { path ->
