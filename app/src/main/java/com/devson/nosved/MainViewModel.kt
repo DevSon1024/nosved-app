@@ -174,7 +174,32 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // Add this new method for auto-fetch on paste
+    fun pasteUrlOnly(): String {
+        return try {
+            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            val clipData = clipboard.primaryClip
+            if (clipData != null && clipData.itemCount > 0) {
+                val pastedText = clipData.getItemAt(0).text?.toString() ?: ""
+                _currentUrl.value = pastedText
+
+                // Only paste, don't auto-fetch
+                if (pastedText.isNotBlank()) {
+                    showToast("📋 URL pasted successfully")
+                } else {
+                    showToast("📋 Clipboard is empty")
+                }
+
+                pastedText
+            } else {
+                showToast("📋 Clipboard is empty")
+                ""
+            }
+        } catch (e: Exception) {
+            showToast("❌ Failed to paste from clipboard")
+            ""
+        }
+    }
+
     fun pasteFromClipboard(): String {
         return try {
             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
