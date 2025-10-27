@@ -14,9 +14,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import java.io.File
 import com.devson.nosved.data.*
-
+import kotlinx.coroutines.launch
+import java.io.File
+import androidx.compose.foundation.clickable
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -24,6 +25,16 @@ fun SettingsScreen(
     onNavigateBack: () -> Unit
 ) {
     val context = LocalContext.current
+    val qualityPrefs = remember { QualityPreferences(context) }
+    val scope = rememberCoroutineScope()
+
+    // State for showing pickers
+    var showVideoPopup by remember { mutableStateOf(false) }
+    var showAudioPopup by remember { mutableStateOf(false) }
+
+    val defaultVideoQuality by qualityPrefs.videoQuality.collectAsState(initial = "720p")
+    val defaultAudioQuality by qualityPrefs.audioQuality.collectAsState(initial = "128kbps")
+    val downloadMode by qualityPrefs.downloadMode.collectAsState(initial = DownloadMode.VIDEO_AUDIO)
 
     Scaffold(
         topBar = {
@@ -44,72 +55,54 @@ fun SettingsScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            item {
-                SettingsCategory(title = "Download Settings")
-            }
+            item { SettingsCategory(title = "Download Settings") }
 
             item {
                 SettingsItem(
                     icon = Icons.Default.Folder,
                     title = "Download Location",
                     subtitle = "${Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)}/nosved",
-                    onClick = {
-                        openDownloadFolder(context)
-                    }
+                    onClick = { openDownloadFolder(context) }
                 )
             }
 
+            // Default Video Quality
             item {
-                val context = LocalContext.current
-                val qualityPrefs = remember { QualityPreferences(context) }
-                val defaultVideoQuality by qualityPrefs.videoQuality.collectAsState(initial = "720p")
-
                 SettingsItem(
                     icon = Icons.Default.HighQuality,
                     title = "Default Video Quality",
                     subtitle = defaultVideoQuality,
-                    onClick = {
-                        // Open quality selection dialog
-                    }
+                    onClick = { showVideoPopup = true }
                 )
             }
 
+            // Default Audio Quality
             item {
-                val context = LocalContext.current
-                val qualityPrefs = remember { QualityPreferences(context) }
-                val defaultAudioQuality by qualityPrefs.audioQuality.collectAsState(initial = "128kbps")
-
                 SettingsItem(
                     icon = Icons.Default.AudioFile,
                     title = "Default Audio Quality",
                     subtitle = defaultAudioQuality,
-                    onClick = {
-                        // Open audio quality selection
-                    }
+                    onClick = { showAudioPopup = true }
                 )
             }
-            item {
-                val context = LocalContext.current
-                val qualityPrefs = remember { QualityPreferences(context) }
-                val downloadMode by qualityPrefs.downloadMode.collectAsState(initial = DownloadMode.VIDEO_AUDIO)
 
+            // Download mode (video+audio or audio only)
+            item {
                 SettingsItem(
                     icon = Icons.Default.Download,
                     title = "Default Download Mode",
                     subtitle = if (downloadMode == DownloadMode.AUDIO_ONLY) "Audio Only" else "Video + Audio",
                     onClick = {
-                        // Open download mode selection
+                        scope.launch {
+                            val nextMode = if (downloadMode == DownloadMode.AUDIO_ONLY) DownloadMode.VIDEO_AUDIO else DownloadMode.AUDIO_ONLY
+                            qualityPrefs.setDownloadMode(nextMode)
+                        }
                     }
                 )
             }
 
-            item {
-                Divider(modifier = Modifier.padding(vertical = 8.dp))
-            }
-
-            item {
-                SettingsCategory(title = "Storage")
-            }
+            item { Divider(modifier = Modifier.padding(vertical = 8.dp)) }
+            item { SettingsCategory(title = "Storage") }
 
             item {
                 val storageInfo = getStorageInfo(context)
@@ -117,9 +110,7 @@ fun SettingsScreen(
                     icon = Icons.Default.Storage,
                     title = "Storage Usage",
                     subtitle = "Used: ${storageInfo.first} • Available: ${storageInfo.second}",
-                    onClick = {
-                        // TODO: Show storage details
-                    }
+                    onClick = { /* TODO */ }
                 )
             }
 
@@ -128,62 +119,122 @@ fun SettingsScreen(
                     icon = Icons.Default.CleaningServices,
                     title = "Clear Cache",
                     subtitle = "Remove temporary files",
-                    onClick = {
-                        clearAppCache(context)
-                    }
+                    onClick = { clearAppCache(context) }
                 )
             }
 
-            item {
-                Divider(modifier = Modifier.padding(vertical = 8.dp))
-            }
-
-            item {
-                SettingsCategory(title = "About")
-            }
+            item { Divider(modifier = Modifier.padding(vertical = 8.dp)) }
+            item { SettingsCategory(title = "About") }
 
             item {
                 SettingsItem(
                     icon = Icons.Default.Info,
                     title = "App Version",
                     subtitle = "1.0.0",
-                    onClick = { /* No action */ }
+                    onClick = { }
                 )
             }
-
             item {
                 SettingsItem(
                     icon = Icons.Default.Code,
                     title = "Source Code",
                     subtitle = "View on GitHub",
-                    onClick = {
-                        openGitHub(context)
-                    }
+                    onClick = { openGitHub(context) }
                 )
             }
-
             item {
                 SettingsItem(
                     icon = Icons.Default.BugReport,
                     title = "Report Issue",
                     subtitle = "Found a bug? Let us know",
-                    onClick = {
-                        openIssueTracker(context)
-                    }
+                    onClick = { openIssueTracker(context) }
                 )
             }
-
             item {
                 SettingsItem(
                     icon = Icons.Default.Share,
                     title = "Share App",
                     subtitle = "Tell your friends about Nosved",
-                    onClick = {
-                        shareApp(context)
-                    }
+                    onClick = { shareApp(context) }
                 )
             }
         }
+    }
+
+    // Video Quality Picker Dialog
+    if (showVideoPopup) {
+        AlertDialog(
+            onDismissRequest = { showVideoPopup = false },
+            title = { Text("Choose Default Video Quality") },
+            text = {
+                Column {
+                    QualityConstants.VIDEO_MP4_QUALITIES.forEach { option ->
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                                .clickable {
+                                    scope.launch { qualityPrefs.setVideoQuality(option.value) }
+                                    showVideoPopup = false
+                                },
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = defaultVideoQuality == option.value,
+                                onClick = {
+                                    scope.launch { qualityPrefs.setVideoQuality(option.value) }
+                                    showVideoPopup = false
+                                }
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(option.label)
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showVideoPopup = false }) { Text("Cancel") }
+            }
+        )
+    }
+
+    // Audio Quality Picker Dialog
+    if (showAudioPopup) {
+        AlertDialog(
+            onDismissRequest = { showAudioPopup = false },
+            title = { Text("Choose Default Audio Quality") },
+            text = {
+                Column {
+                    QualityConstants.AUDIO_M4A_QUALITIES.forEach { option ->
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                                .clickable {
+                                    scope.launch { qualityPrefs.setAudioQuality(option.value) }
+                                    showAudioPopup = false
+                                },
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = defaultAudioQuality == option.value,
+                                onClick = {
+                                    scope.launch { qualityPrefs.setAudioQuality(option.value) }
+                                    showAudioPopup = false
+                                }
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(option.label)
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showAudioPopup = false }) { Text("Cancel") }
+            }
+        )
     }
 }
 
