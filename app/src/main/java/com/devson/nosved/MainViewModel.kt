@@ -154,15 +154,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun selectAudioFormat(format: VideoFormat) {
         _selectedAudioFormat.value = format
     }
-
-    // === SMART FORMAT SELECTION ===
-
-    /**
-     * Finds the best audio format by requiring:
-     * - Matching container (usually "m4a" or "webm")
-     * - Equal or lower than the preferred bitrate, but as high as possible
-     * - If nothing, picks lowest of that container only
-     */
     private fun findNearestAudioFormat(
         formats: List<VideoFormat>,
         preferredBitrate: Int,
@@ -209,6 +200,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun downloadVideoWithQuality(
         videoInfo: VideoInfo,
+        customTitle: String,
         downloadMode: DownloadMode,
         preferredVideoQuality: String,
         preferredAudioQuality: String,
@@ -229,7 +221,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     selectedAudio = findNearestAudioFormat(formats, targetAudioBitrate, preferredAudioContainer)
                         ?: findNearestAudioFormat(formats, targetAudioBitrate, "webm")
                     if (selectedAudio != null) {
-                        downloadAudioOnly(videoInfo, selectedAudio)
+                        downloadAudioOnly(videoInfo, selectedAudio, customTitle)
                         _selectedAudioFormat.value = selectedAudio
                         _selectedVideoFormat.value = null
                     } else showToast("❌ No suitable audio format found.")
@@ -240,7 +232,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     selectedAudio = findNearestAudioFormat(formats, targetAudioBitrate, preferredAudioContainer)
                         ?: findNearestAudioFormat(formats, targetAudioBitrate, "webm")
                     if (selectedVideo != null && selectedAudio != null) {
-                        downloadVideo(videoInfo, selectedVideo, selectedAudio)
+                        downloadVideo(videoInfo, selectedVideo, selectedAudio, customTitle)
                         _selectedVideoFormat.value = selectedVideo
                         _selectedAudioFormat.value = selectedAudio
                     } else showToast("❌ No suitable video/audio format found.")
@@ -250,7 +242,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun parseQualityFromString(q: String): Int {
-        return q.toLowerCase(Locale.ROOT)
+        // Fix: Use lowercase() instead of toLowerCase(Locale.ROOT)
+        return q.lowercase(Locale.ROOT)
             .replace("p", "")
             .replace("kbps", "")
             .trim()
@@ -259,15 +252,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     // === DOWNLOAD FUNCTIONS ===
 
-    fun downloadVideo(videoInfo: VideoInfo, videoFormat: VideoFormat, audioFormat: VideoFormat) {
+    fun downloadVideo(videoInfo: VideoInfo, videoFormat: VideoFormat, audioFormat: VideoFormat, customTitle: String) {
         viewModelScope.launch (Dispatchers.IO){
             val downloadId = UUID.randomUUID().toString()
             // Calculate the total size
             val totalSize = (videoFormat.fileSize ?: 0L) + (audioFormat.fileSize ?: 0L)
 
+            val titleToUse = customTitle.ifBlank { videoInfo.title ?: "Unknown Title" }
+
             val downloadEntity = DownloadEntity(
                 id = downloadId,
-                title = videoInfo.title ?: "Unknown Title",
+                title = titleToUse,
                 url = videoInfo.webpageUrl ?: "",
                 thumbnail = videoInfo.thumbnail,
                 filePath = null,
@@ -280,8 +275,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 audioFormat = "${audioFormat.abr}kbps"
             )
             downloadDao.insertDownload(downloadEntity)
-            showToast("Download started: ${videoInfo.title}")
-            startDownload(downloadId, videoInfo, videoFormat, audioFormat)
+            showToast("Download started: $titleToUse")
+            startDownload(downloadId, videoInfo, videoFormat, audioFormat, titleToUse)
         }
     }
 
@@ -289,7 +284,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         downloadId: String,
         videoInfo: VideoInfo,
         videoFormat: VideoFormat,
-        audioFormat: VideoFormat
+        audioFormat: VideoFormat,
+        titleToUse: String
     ) {
         withContext(Dispatchers.IO) {
             try {
@@ -298,7 +294,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val downloadDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
                 val nosvedDir = File(downloadDir, "nosved")
                 if (!nosvedDir.exists()) nosvedDir.mkdirs()
-                val sanitizedTitle = videoInfo.title?.replace("[^a-zA-Z0-9.-]".toRegex(), "_") ?: "video"
+                val sanitizedTitle = titleToUse.replace("[^a-zA-Z0-9.-]".toRegex(), "_")
                 val fileName = "${sanitizedTitle}.%(ext)s"
                 val filePath = File(nosvedDir, "${sanitizedTitle}.mp4")
                 val request = YoutubeDLRequest(videoInfo.webpageUrl ?: "")
@@ -337,8 +333,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         progress = 100
                     ) ?: return@withContext
                 )
-                showToast("✅ Download completed: ${videoInfo.title}")
-                notificationHelper.showDownloadCompleteNotification(videoInfo.title ?: "Unknown Title", filePath.absolutePath)
+                showToast("✅ Download completed: $titleToUse")
+                notificationHelper.showDownloadCompleteNotification(titleToUse, filePath.absolutePath)
             } catch (e: YoutubeDLException) {
                 showToast("❌ Download failed: ${e.message ?: ""}")
                 downloadDao.updateDownload(
@@ -351,11 +347,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private suspend fun downloadAudioOnly(videoInfo: VideoInfo, audioFormat: VideoFormat) {
+    private suspend fun downloadAudioOnly(videoInfo: VideoInfo, audioFormat: VideoFormat, customTitle: String) {
         val downloadId = UUID.randomUUID().toString()
+        val titleToUse = customTitle.ifBlank { videoInfo.title ?: "Unknown Title" }
+
         val downloadEntity = DownloadEntity(
             id = downloadId,
-            title = "${videoInfo.title} (Audio)",
+            title = "${titleToUse} (Audio)",
             url = videoInfo.webpageUrl ?: "",
             thumbnail = videoInfo.thumbnail,
             filePath = null,
@@ -368,14 +366,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             audioFormat = "${audioFormat.abr}kbps"
         )
         downloadDao.insertDownload(downloadEntity)
-        showToast("Audio download started: ${videoInfo.title}")
-        startAudioDownload(downloadId, videoInfo, audioFormat)
+        showToast("Audio download started: $titleToUse")
+        startAudioDownload(downloadId, videoInfo, audioFormat, titleToUse)
     }
 
     private suspend fun startAudioDownload(
         downloadId: String,
         videoInfo: VideoInfo,
-        audioFormat: VideoFormat
+        audioFormat: VideoFormat,
+        titleToUse: String
     ) {
         withContext(Dispatchers.IO) {
             try {
@@ -384,7 +383,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val downloadDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
                 val nosvedDir = File(downloadDir, "nosved")
                 if (!nosvedDir.exists()) nosvedDir.mkdirs()
-                val sanitizedTitle = videoInfo.title?.replace("[^a-zA-Z0-9.-]".toRegex(), "_") ?: "audio"
+                val sanitizedTitle = titleToUse.replace("[^a-zA-Z0-9.-]".toRegex(), "_")
                 val fileName = "${sanitizedTitle}.%(ext)s"
                 val audioExtension = audioFormat.ext ?: "mp3"
                 val filePath = File(nosvedDir, "${sanitizedTitle}.${audioExtension}")
@@ -421,9 +420,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         progress = 100
                     ) ?: return@withContext
                 )
-                showToast("✅ Audio download completed: ${videoInfo.title}")
+                showToast("✅ Audio download completed: $titleToUse")
                 notificationHelper.showDownloadCompleteNotification(
-                    "${videoInfo.title} (Audio)", filePath.absolutePath
+                    "${titleToUse} (Audio)", filePath.absolutePath
                 )
             } catch (e: Exception) {
                 showToast("❌ Audio download failed: ${e.message ?: ""}")

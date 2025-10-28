@@ -40,6 +40,9 @@ fun VideoInfoScreen(
     var showAdvancedSheet by remember { mutableStateOf(false) }
     var selectedDownloadMode by remember { mutableStateOf(DownloadMode.VIDEO_AUDIO) }
 
+    // State for the editable title
+    var customTitle by remember(videoInfo) { mutableStateOf(videoInfo?.title ?: "") }
+
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     // Collect quality preferences
@@ -56,6 +59,11 @@ fun VideoInfoScreen(
     LaunchedEffect(videoInfo) {
         if (videoInfo == null) {
             onBack()
+        } else {
+            // Update custom title if videoInfo changes and title is not yet modified
+            if (customTitle.isEmpty() || customTitle == "Unknown Title") {
+                customTitle = videoInfo?.title ?: "Unknown Title"
+            }
         }
     }
 
@@ -103,13 +111,17 @@ fun VideoInfoScreen(
                             modifier = Modifier.padding(20.dp),
                             verticalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
-                            // Title
-                            Text(
-                                text = info.title ?: "Unknown Title",
-                                style = MaterialTheme.typography.headlineSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                textAlign = TextAlign.Start
+                            // Title - NOW EDITABLE
+                            OutlinedTextField(
+                                value = customTitle,
+                                onValueChange = { customTitle = it },
+                                label = { Text("Download Title") },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                textStyle = MaterialTheme.typography.headlineSmall.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
                             )
 
                             // Video Stats
@@ -316,9 +328,9 @@ fun VideoInfoScreen(
                     // Download Button
                     Button(
                         onClick = {
-                            // Use smart format selection based on mode and preferences
                             viewModel.downloadVideoWithQuality(
                                 videoInfo = info,
+                                customTitle = customTitle,
                                 downloadMode = selectedDownloadMode,
                                 preferredVideoQuality = defaultVideoQuality,
                                 preferredAudioQuality = defaultAudioQuality
@@ -386,7 +398,7 @@ fun VideoInfoScreen(
                         val videoFormat = selectedVideoFormat
                         val audioFormat = selectedAudioFormat
                         if (videoFormat != null && audioFormat != null) {
-                            viewModel.downloadVideo(info, videoFormat, audioFormat)
+                            viewModel.downloadVideo(info, videoFormat, audioFormat, customTitle) // Pass customTitle
                             showAdvancedSheet = false
                             onBack()
                         }

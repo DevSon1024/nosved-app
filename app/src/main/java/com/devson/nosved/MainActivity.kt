@@ -14,6 +14,8 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -30,6 +32,7 @@ import com.devson.nosved.ui.theme.NosvedTheme
 import com.devson.nosved.ui.screens.HomeScreen
 import com.devson.nosved.ui.screens.VideoInfoScreen
 import com.devson.nosved.ui.screens.DownloadsScreen
+import com.devson.nosved.ui.screens.QualitySettingsScreen
 import com.devson.nosved.ui.screens.SettingsScreen
 import com.yausername.ffmpeg.FFmpeg
 import com.yausername.youtubedl_android.YoutubeDL
@@ -174,7 +177,13 @@ fun MainContent(viewModel: MainViewModel) {
                 DownloadsScreen(viewModel)
             }
             composable("settings") {
-                SettingsScreen(onNavigateBack = { navController.navigateUp() })
+                SettingsScreen(
+                    onNavigateBack = { navController.navigateUp() },
+                    onNavigateToQualitySettings = { navController.navigate("quality_settings") }
+                )
+            }
+            composable("quality_settings") {
+                QualitySettingsScreen(onNavigateBack = { navController.navigateUp() })
             }
         }
     }
@@ -194,7 +203,8 @@ fun OptimizedTopBar(
             title = { Text("Video Details") },
             navigationIcon = {
                 IconButton(onClick = onNavigateUp) {
-                    Icon(Icons.Default.ArrowBack, "Back")
+                    // Fix: Use AutoMirrored.Filled.ArrowBack
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
                 }
             }
         )
@@ -329,10 +339,12 @@ fun OptimizedBottomNavigation(
                     BadgedBox(
                         badge = { Badge { Text("$runningCount") } }
                     ) {
-                        Icon(Icons.Default.List, "Downloads")
+                        // Fix: Use AutoMirrored.Filled.List
+                        Icon(Icons.AutoMirrored.Filled.List, "Downloads")
                     }
                 } else {
-                    Icon(Icons.Default.List, "Downloads")
+                    // Fix: Use AutoMirrored.Filled.List
+                    Icon(Icons.AutoMirrored.Filled.List, "Downloads")
                 }
             },
             label = { Text("Downloads") },

@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -28,21 +29,17 @@ import java.text.DecimalFormat
 // Fix: Properly define sealed class
 sealed class DialogState {
     object None : DialogState()
-    object VideoQuality : DialogState()
-    object AudioQuality : DialogState()
     object DownloadLocation : DialogState()
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    onNavigateToQualitySettings: () -> Unit
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-
-    // Optimize preferences loading - single instance
-    val qualityPrefs = remember { QualityPreferences(context) }
 
     // Fix: Initialize with proper DialogState.None
     var dialogState by remember { mutableStateOf<DialogState>(DialogState.None) }
@@ -54,11 +51,6 @@ fun SettingsScreen(
             getStorageInfoOptimized(context)
         }
     }
-
-    // Collect states efficiently with initial values
-    val defaultVideoQuality by qualityPrefs.videoQuality.collectAsState(initial = "720p")
-    val defaultAudioQuality by qualityPrefs.audioQuality.collectAsState(initial = "128kbps")
-    val downloadMode by qualityPrefs.downloadMode.collectAsState(initial = DownloadMode.VIDEO_AUDIO)
 
     // Optimize download folder - don't recalculate on every recomposition
     val downloadFolder = remember { getCurrentDownloadFolder(context) }
@@ -77,7 +69,8 @@ fun SettingsScreen(
                 title = { Text("Settings") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, "Back")
+                        // Fix: Use AutoMirrored.Filled.ArrowBack
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
                     }
                 }
             )
@@ -85,21 +78,9 @@ fun SettingsScreen(
     ) { paddingValues ->
         OptimizedSettingsList(
             modifier = Modifier.padding(paddingValues),
-            defaultVideoQuality = defaultVideoQuality,
-            defaultAudioQuality = defaultAudioQuality,
-            downloadMode = downloadMode,
             downloadFolder = downloadFolder,
             storageInfo = storageInfo,
-            // Fix: Correct DialogState assignments
-            onVideoQualityClick = { dialogState = DialogState.VideoQuality },
-            onAudioQualityClick = { dialogState = DialogState.AudioQuality },
-            onDownloadModeClick = {
-                scope.launch {
-                    val nextMode = if (downloadMode == DownloadMode.AUDIO_ONLY)
-                        DownloadMode.VIDEO_AUDIO else DownloadMode.AUDIO_ONLY
-                    qualityPrefs.setDownloadMode(nextMode)
-                }
-            },
+            onNavigateToQualitySettings = onNavigateToQualitySettings,
             onDownloadLocationClick = { dialogState = DialogState.DownloadLocation },
             onClearCacheClick = {
                 scope.launch {
@@ -120,26 +101,6 @@ fun SettingsScreen(
 
     // Fix: Handle dialogs efficiently with proper when expression
     when (val currentDialogState = dialogState) {
-        is DialogState.VideoQuality -> {
-            VideoQualityDialog(
-                currentQuality = defaultVideoQuality,
-                onDismiss = { dialogState = DialogState.None },
-                onQualitySelected = { quality ->
-                    scope.launch { qualityPrefs.setVideoQuality(quality) }
-                    dialogState = DialogState.None
-                }
-            )
-        }
-        is DialogState.AudioQuality -> {
-            AudioQualityDialog(
-                currentQuality = defaultAudioQuality,
-                onDismiss = { dialogState = DialogState.None },
-                onQualitySelected = { quality ->
-                    scope.launch { qualityPrefs.setAudioQuality(quality) }
-                    dialogState = DialogState.None
-                }
-            )
-        }
         is DialogState.DownloadLocation -> {
             OptimizedDownloadFolderDialog(
                 downloadFolder = downloadFolder,
@@ -167,14 +128,9 @@ fun SettingsScreen(
 @Composable
 fun OptimizedSettingsList(
     modifier: Modifier = Modifier,
-    defaultVideoQuality: String,
-    defaultAudioQuality: String,
-    downloadMode: DownloadMode,
     downloadFolder: String,
     storageInfo: Pair<String, String>,
-    onVideoQualityClick: () -> Unit,
-    onAudioQualityClick: () -> Unit,
-    onDownloadModeClick: () -> Unit,
+    onNavigateToQualitySettings: () -> Unit,
     onDownloadLocationClick: () -> Unit,
     onClearCacheClick: () -> Unit,
     onShareClick: () -> Unit,
@@ -198,26 +154,10 @@ fun OptimizedSettingsList(
             }
             item {
                 OptimizedSettingsItem(
-                    icon = Icons.Default.HighQuality,
-                    title = "Default Video Quality",
-                    subtitle = defaultVideoQuality,
-                    onClick = onVideoQualityClick
-                )
-            }
-            item {
-                OptimizedSettingsItem(
-                    icon = Icons.Default.AudioFile,
-                    title = "Default Audio Quality",
-                    subtitle = defaultAudioQuality,
-                    onClick = onAudioQualityClick
-                )
-            }
-            item {
-                OptimizedSettingsItem(
-                    icon = Icons.Default.Download,
-                    title = "Default Download Mode",
-                    subtitle = if (downloadMode == DownloadMode.AUDIO_ONLY) "Audio Only" else "Video + Audio",
-                    onClick = onDownloadModeClick
+                    icon = Icons.Default.Tune,
+                    title = "Download Quality Settings",
+                    subtitle = "Set default mode, formats, and quality",
+                    onClick = onNavigateToQualitySettings
                 )
             }
         }
@@ -345,78 +285,6 @@ fun OptimizedSettingsItem(
 }
 
 // Optimized dialogs
-@Composable
-fun VideoQualityDialog(
-    currentQuality: String,
-    onDismiss: () -> Unit,
-    onQualitySelected: (String) -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Video Quality") },
-        text = {
-            Column {
-                QualityConstants.VIDEO_MP4_QUALITIES.forEach { option ->
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .clickable { onQualitySelected(option.value) }
-                            .padding(vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        RadioButton(
-                            selected = currentQuality == option.value,
-                            onClick = { onQualitySelected(option.value) }
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Text(option.label)
-                    }
-                }
-            }
-        },
-        confirmButton = {},
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
-        }
-    )
-}
-
-@Composable
-fun AudioQualityDialog(
-    currentQuality: String,
-    onDismiss: () -> Unit,
-    onQualitySelected: (String) -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Audio Quality") },
-        text = {
-            Column {
-                QualityConstants.AUDIO_M4A_QUALITIES.forEach { option ->
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .clickable { onQualitySelected(option.value) }
-                            .padding(vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        RadioButton(
-                            selected = currentQuality == option.value,
-                            onClick = { onQualitySelected(option.value) }
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Text(option.label)
-                    }
-                }
-            }
-        },
-        confirmButton = {},
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
-        }
-    )
-}
-
 @Composable
 fun OptimizedDownloadFolderDialog(
     downloadFolder: String,

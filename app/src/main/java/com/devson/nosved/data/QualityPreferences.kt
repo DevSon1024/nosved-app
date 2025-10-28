@@ -17,6 +17,8 @@ class QualityPreferences(private val context: Context) {
         val VIDEO_QUALITY_KEY = stringPreferencesKey("video_quality")
         val AUDIO_QUALITY_KEY = stringPreferencesKey("audio_quality")
         val DOWNLOAD_MODE_KEY = stringPreferencesKey("download_mode")
+        val VIDEO_CONTAINER_KEY = stringPreferencesKey("video_container")
+        val AUDIO_CONTAINER_KEY = stringPreferencesKey("audio_container")
     }
 
     val videoQuality: Flow<String> = context.dataStore.data
@@ -34,6 +36,12 @@ class QualityPreferences(private val context: Context) {
             }
         }
 
+    val videoContainer: Flow<String> = context.dataStore.data
+        .map { preferences -> preferences[VIDEO_CONTAINER_KEY] ?: "MP4" }
+
+    val audioContainer: Flow<String> = context.dataStore.data
+        .map { preferences -> preferences[AUDIO_CONTAINER_KEY] ?: "M4A" }
+
     suspend fun setVideoQuality(quality: String) {
         context.dataStore.edit { preferences ->
             preferences[VIDEO_QUALITY_KEY] = quality
@@ -49,6 +57,18 @@ class QualityPreferences(private val context: Context) {
     suspend fun setDownloadMode(mode: DownloadMode) {
         context.dataStore.edit { preferences ->
             preferences[DOWNLOAD_MODE_KEY] = mode.name
+        }
+    }
+
+    suspend fun setVideoContainer(container: String) {
+        context.dataStore.edit { preferences ->
+            preferences[VIDEO_CONTAINER_KEY] = container
+        }
+    }
+
+    suspend fun setAudioContainer(container: String) {
+        context.dataStore.edit { preferences ->
+            preferences[AUDIO_CONTAINER_KEY] = container
         }
     }
 }

@@ -45,7 +45,8 @@ fun VideoScreen(
                 onDownload = {
                     val v = selVideo ?: return@FormatSelectionSheet
                     val a = selAudio ?: return@FormatSelectionSheet
-                    viewModel.downloadVideo(info!!, v, a)
+                    // Fix: Pass the customTitle parameter
+                    viewModel.downloadVideo(info!!, v, a, info!!.title ?: "Unknown Title")
                     showSheet = false
                 }
             )
