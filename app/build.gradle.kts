@@ -137,65 +137,52 @@ android {
 val youtubedlAndroid = "0.17.3"
 
 dependencies {
-    // YouTubeDL Android - Optimized version
-    implementation("io.github.junkfood02.youtubedl-android:library:${youtubedlAndroid}")
-    implementation("io.github.junkfood02.youtubedl-android:ffmpeg:${youtubedlAndroid}")
+    // YouTubeDL Android - Same optimized version as Seal
+    implementation("io.github.junkfood02.youtubedl-android:library:0.17.3")
+    implementation("io.github.junkfood02.youtubedl-android:ffmpeg:0.17.3")
 
-    // Core Android Components
+    // Core Android Components - Latest stable versions
     implementation("androidx.core:core-ktx:1.13.1")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.4")
-    implementation("androidx.activity:activity-compose:1.9.1")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.6")
+    implementation("androidx.activity:activity-compose:1.9.2")
 
-    // Compose BOM and UI
-    implementation(platform("androidx.compose:compose-bom:2024.06.00"))
+    // Compose BOM - Performance optimized
+    implementation(platform("androidx.compose:compose-bom:2024.10.00"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
 
-    // Animation dependencies
+    // Essential animation dependencies only
     implementation("androidx.compose.animation:animation")
     implementation("androidx.compose.animation:animation-core")
-    implementation("androidx.compose.animation:animation-graphics")
     implementation("androidx.compose.foundation:foundation")
 
-    // Navigation with animation support
-    implementation("androidx.navigation:navigation-compose:2.7.7")
+    // Navigation with performance optimization
+    implementation("androidx.navigation:navigation-compose:2.8.2")
 
-    // Lifecycle and ViewModel
-    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.4")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.4")
-    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.4")
+    // Lifecycle and ViewModel - Performance focused
+    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.6")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.6")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.6")
 
-    // Room Database - Performance optimized
+    // Room Database - Optimized
     implementation("androidx.room:room-runtime:2.6.1")
     implementation("androidx.room:room-ktx:2.6.1")
-    // Removed room-paging to reduce size
     kapt("androidx.room:room-compiler:2.6.1")
 
-    // Image Loading - Essential only
-    implementation("io.coil-kt:coil-compose:2.6.0")
-    // Removed coil-gif and coil-svg to reduce size
+    // Image Loading - Essential only (like Seal)
+    implementation("io.coil-kt:coil-compose:2.7.0")
 
     // Performance monitoring
     implementation("androidx.compose.runtime:runtime-tracing:1.0.0-beta01")
 
-    // Paging for large lists
-    implementation("androidx.paging:paging-runtime-ktx:3.3.1")
-    implementation("androidx.paging:paging-compose:3.3.1")
+    // Date/Time - Lightweight
+    implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.1")
 
-    // Date/Time
-    implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.0")
-
-    // JSON Parsing
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")
-
-    // Permissions
-    implementation("com.google.accompanist:accompanist-permissions:0.34.0")
-
-    // File operations
-    implementation("androidx.documentfile:documentfile:1.0.1")
+    // JSON Parsing - Performance optimized
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
 
     // Coroutines - Performance optimized
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
@@ -203,28 +190,28 @@ dependencies {
 
     // Network optimization
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
-    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
 
     // Data storage - Performance optimized
     implementation("androidx.datastore:datastore-preferences:1.1.1")
     implementation("com.tencent:mmkv:1.3.9")
 
-    // Testing
-    testImplementation("junit:junit:4.13.2")
-    androidTestImplementation("androidx.test.ext:junit:1.2.1")
-    androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")
-    androidTestImplementation(platform("androidx.compose:compose-bom:2024.06.00"))
-    androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+    // Essential dependencies only
+    implementation("com.google.accompanist:accompanist-permissions:0.34.0")
+    implementation("androidx.documentfile:documentfile:1.0.1")
 
-    // Debug tools
+    // Debug tools - Only for debug builds
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
 
-// Optimize builds
+// Optimize builds like Seal
 configurations.all {
     resolutionStrategy {
         force("org.jetbrains:annotations:24.1.0")
-        force("androidx.annotation:annotation:1.8.1")
+        force("androidx.annotation:annotation:1.8.2")
     }
+
+    // Remove duplicate dependencies
+    exclude(group = "org.jetbrains.kotlin", module = "kotlin-stdlib-jdk7")
+    exclude(group = "org.jetbrains.kotlin", module = "kotlin-stdlib-jdk8")
 }

@@ -5,14 +5,12 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -22,9 +20,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -44,34 +40,15 @@ class MainActivity : ComponentActivity() {
     private val viewModel: MainViewModel by viewModels()
 
     private val requestPermissionLauncher =
-        registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
-            if (isGranted) {
-                Toast.makeText(this, "Notifications permission granted", Toast.LENGTH_SHORT).show()
-            } else {
-                Toast.makeText(this, "Notifications permission denied", Toast.LENGTH_SHORT).show()
-            }
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { _ ->
+            // Simplified permission handling
         }
-
-    private fun askNotificationPermission() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) !=
-                PackageManager.PERMISSION_GRANTED
-            ) {
-                requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-            }
-        }
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        try {
-            YoutubeDL.getInstance().init(this)
-            FFmpeg.getInstance().init(this)
-        } catch (e: YoutubeDLException) {
-            Log.e("NosvedApp", "Failed to initialize youtubedl-android", e)
-        }
-
+        // Lightweight initialization
+        initializeDownloader()
         askNotificationPermission()
 
         setContent {
@@ -85,6 +62,24 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    private fun initializeDownloader() {
+        try {
+            YoutubeDL.getInstance().init(this)
+            FFmpeg.getInstance().init(this)
+        } catch (e: YoutubeDLException) {
+            Log.e("NosvedApp", "Failed to initialize youtubedl-android", e)
+        }
+    }
+
+    private fun askNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) !=
+                PackageManager.PERMISSION_GRANTED) {
+                requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -94,15 +89,14 @@ fun MainContent(viewModel: MainViewModel) {
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = currentBackStackEntry?.destination?.route
 
-    // Listen for video info changes and navigate automatically
+    // Optimized state collection - only collect when needed
     val videoInfo by viewModel.videoInfo.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
 
-    LaunchedEffect(videoInfo) {
-        // Navigate to VideoInfo screen when video info is successfully fetched
+    // Reduced recomposition scope for navigation
+    LaunchedEffect(videoInfo, isLoading) {
         if (videoInfo != null && !isLoading) {
             navController.navigate("video_info") {
-                // Don't add to back stack if we're already there
                 launchSingleTop = true
             }
         }
@@ -110,115 +104,21 @@ fun MainContent(viewModel: MainViewModel) {
 
     Scaffold(
         topBar = {
-            // Show back button only on VideoInfo screen
-            if (currentDestination == "video_info") {
-                TopAppBar(
-                    title = { Text("Video Details") },
-                    navigationIcon = {
-                        IconButton(
-                            onClick = { navController.navigateUp() }
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.ArrowBack,
-                                contentDescription = "Back to Home"
-                            )
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surface
-                    )
-                )
-            } else {
-                // Regular top bar for other screens
-                TopAppBar(
-                    title = {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Surface(
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .clip(CircleShape),
-                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.VideoLibrary,
-                                    contentDescription = "App Logo",
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.padding(6.dp)
-                                )
-                            }
-
-                            Spacer(modifier = Modifier.width(12.dp))
-
-                            Text(
-                                text = "Nosved",
-                                style = MaterialTheme.typography.headlineSmall.copy(
-                                    fontWeight = FontWeight.Bold
-                                ),
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                    },
-                    actions = {
-                        val allDownloads by viewModel.allDownloads.collectAsState(initial = emptyList())
-                        val runningDownloads = allDownloads.count {
-                            it.status == com.devson.nosved.data.DownloadStatus.DOWNLOADING ||
-                                    it.status == com.devson.nosved.data.DownloadStatus.QUEUED
-                        }
-
-                        if (runningDownloads > 0) {
-                            BadgedBox(
-                                badge = {
-                                    Badge(
-                                        containerColor = MaterialTheme.colorScheme.error,
-                                        contentColor = MaterialTheme.colorScheme.onError
-                                    ) {
-                                        Text("$runningDownloads")
-                                    }
-                                }
-                            ) {
-                                IconButton(
-                                    onClick = {
-                                        navController.navigate("downloads") {
-                                            launchSingleTop = true
-                                        }
-                                    }
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.CloudDownload,
-                                        contentDescription = "Active Downloads"
-                                    )
-                                }
-                            }
-                        }
-
-                        IconButton(
-                            onClick = {
-                                navController.navigate("settings") {
-                                    launchSingleTop = true
-                                }
-                            }
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Settings,
-                                contentDescription = "Settings"
-                            )
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surface,
-                        titleContentColor = MaterialTheme.colorScheme.onSurface,
-                        actionIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                )
-            }
+            OptimizedTopBar(
+                currentDestination = currentDestination,
+                onNavigateUp = { navController.navigateUp() },
+                onNavigateToDownloads = {
+                    navController.navigate("downloads") { launchSingleTop = true }
+                },
+                onNavigateToSettings = {
+                    navController.navigate("settings") { launchSingleTop = true }
+                },
+                viewModel = viewModel
+            )
         },
         bottomBar = {
-            // Hide bottom navigation on VideoInfo screen for cleaner look
             if (currentDestination != "video_info") {
-                EnhancedBottomNavigation(
+                OptimizedBottomNavigation(
                     currentDestination = currentDestination,
                     onNavigate = { route ->
                         if (currentDestination != route) {
@@ -228,9 +128,7 @@ fun MainContent(viewModel: MainViewModel) {
                             }
                         }
                     },
-                    onQuickDownload = {
-                        viewModel.pasteFromClipboard()
-                    },
+                    onQuickDownload = { viewModel.pasteFromClipboard() },
                     viewModel = viewModel
                 )
             }
@@ -240,66 +138,151 @@ fun MainContent(viewModel: MainViewModel) {
             navController = navController,
             startDestination = "home",
             modifier = Modifier.padding(innerPadding),
+            // Simplified animations for better performance
             enterTransition = {
                 slideIntoContainer(
                     towards = AnimatedContentTransitionScope.SlideDirection.Left,
-                    animationSpec = tween(300, easing = EaseOutCubic)
-                ) + fadeIn(animationSpec = tween(300))
+                    animationSpec = tween(200, easing = EaseOutCubic)
+                ) + fadeIn(animationSpec = tween(200))
             },
             exitTransition = {
                 slideOutOfContainer(
                     towards = AnimatedContentTransitionScope.SlideDirection.Left,
-                    animationSpec = tween(300, easing = EaseInCubic)
-                ) + fadeOut(animationSpec = tween(300))
+                    animationSpec = tween(200, easing = EaseInCubic)
+                ) + fadeOut(animationSpec = tween(200))
             },
             popEnterTransition = {
                 slideIntoContainer(
                     towards = AnimatedContentTransitionScope.SlideDirection.Right,
-                    animationSpec = tween(300, easing = EaseOutCubic)
-                ) + fadeIn(animationSpec = tween(300))
+                    animationSpec = tween(200, easing = EaseOutCubic)
+                ) + fadeIn(animationSpec = tween(200))
             },
             popExitTransition = {
                 slideOutOfContainer(
                     towards = AnimatedContentTransitionScope.SlideDirection.Right,
-                    animationSpec = tween(300, easing = EaseInCubic)
-                ) + fadeOut(animationSpec = tween(300))
+                    animationSpec = tween(200, easing = EaseInCubic)
+                ) + fadeOut(animationSpec = tween(200))
             }
         ) {
             composable("home") {
-                HomeScreen(
-                    viewModel = viewModel,
-                    navController = navController
-                )
+                HomeScreen(viewModel = viewModel, navController = navController)
             }
             composable("video_info") {
-                VideoInfoScreen(
-                    viewModel = viewModel,
-                    onBack = { navController.navigateUp() }
-                )
+                VideoInfoScreen(viewModel = viewModel, onBack = { navController.navigateUp() })
             }
             composable("downloads") {
                 DownloadsScreen(viewModel)
             }
             composable("settings") {
-                SettingsScreen(
-                    onNavigateBack = { navController.navigateUp() }
-                )
+                SettingsScreen(onNavigateBack = { navController.navigateUp() })
             }
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun EnhancedBottomNavigation(
+fun OptimizedTopBar(
+    currentDestination: String?,
+    onNavigateUp: () -> Unit,
+    onNavigateToDownloads: () -> Unit,
+    onNavigateToSettings: () -> Unit,
+    viewModel: MainViewModel
+) {
+    if (currentDestination == "video_info") {
+        TopAppBar(
+            title = { Text("Video Details") },
+            navigationIcon = {
+                IconButton(onClick = onNavigateUp) {
+                    Icon(Icons.Default.ArrowBack, "Back")
+                }
+            }
+        )
+    } else {
+        TopAppBar(
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Surface(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(CircleShape),
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                    ) {
+                        Icon(
+                            Icons.Default.VideoLibrary,
+                            "App Logo",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(6.dp)
+                        )
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        "Nosved",
+                        style = MaterialTheme.typography.headlineSmall.copy(
+                            fontWeight = FontWeight.Bold
+                        )
+                    )
+                }
+            },
+            actions = {
+                TopBarActions(
+                    onNavigateToDownloads = onNavigateToDownloads,
+                    onNavigateToSettings = onNavigateToSettings,
+                    viewModel = viewModel
+                )
+            }
+        )
+    }
+}
+
+@Composable
+fun TopBarActions(
+    onNavigateToDownloads: () -> Unit,
+    onNavigateToSettings: () -> Unit,
+    viewModel: MainViewModel
+) {
+    val allDownloads by viewModel.allDownloads.collectAsState(initial = emptyList())
+
+    // Optimize badge calculation with remember
+    val runningCount = remember(allDownloads) {
+        allDownloads.count {
+            it.status == com.devson.nosved.data.DownloadStatus.DOWNLOADING ||
+                    it.status == com.devson.nosved.data.DownloadStatus.QUEUED
+        }
+    }
+
+    if (runningCount > 0) {
+        BadgedBox(
+            badge = {
+                Badge { Text("$runningCount") }
+            }
+        ) {
+            IconButton(onClick = onNavigateToDownloads) {
+                Icon(Icons.Default.CloudDownload, "Downloads")
+            }
+        }
+    }
+
+    IconButton(onClick = onNavigateToSettings) {
+        Icon(Icons.Default.Settings, "Settings")
+    }
+}
+
+@Composable
+fun OptimizedBottomNavigation(
     currentDestination: String?,
     onNavigate: (String) -> Unit,
     onQuickDownload: () -> Unit,
     viewModel: MainViewModel
 ) {
     val allDownloads by viewModel.allDownloads.collectAsState(initial = emptyList())
-    val runningCount = allDownloads.count {
-        it.status == com.devson.nosved.data.DownloadStatus.DOWNLOADING ||
-                it.status == com.devson.nosved.data.DownloadStatus.QUEUED
+
+    // Optimize badge calculation with remember to prevent recomposition
+    val runningCount = remember(allDownloads) {
+        allDownloads.count {
+            it.status == com.devson.nosved.data.DownloadStatus.DOWNLOADING ||
+                    it.status == com.devson.nosved.data.DownloadStatus.QUEUED
+        }
     }
 
     NavigationBar(
@@ -311,20 +294,10 @@ fun EnhancedBottomNavigation(
             icon = {
                 Icon(
                     Icons.Default.Home,
-                    contentDescription = "Home",
-                    tint = if (currentDestination == "home")
-                        MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.onSurfaceVariant
+                    contentDescription = "Home"
                 )
             },
-            label = {
-                Text(
-                    "Home",
-                    color = if (currentDestination == "home")
-                        MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            },
+            label = { Text("Home") },
             selected = currentDestination == "home",
             onClick = { onNavigate("home") }
         )
@@ -337,25 +310,14 @@ fun EnhancedBottomNavigation(
                 ) {
                     FloatingActionButton(
                         onClick = onQuickDownload,
-                        modifier = Modifier.size(48.dp),
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary
+                        modifier = Modifier.size(40.dp),
+                        containerColor = MaterialTheme.colorScheme.primary
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Download,
-                            contentDescription = "Quick Download",
-                            modifier = Modifier.size(24.dp)
-                        )
+                        Icon(Icons.Default.Download, "Quick Download")
                     }
                 }
             },
-            label = {
-                Text(
-                    "Quick",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            },
+            label = { Text("Quick") },
             selected = false,
             onClick = onQuickDownload
         )
@@ -365,41 +327,15 @@ fun EnhancedBottomNavigation(
             icon = {
                 if (runningCount > 0) {
                     BadgedBox(
-                        badge = {
-                            Badge(
-                                containerColor = MaterialTheme.colorScheme.error,
-                                contentColor = MaterialTheme.colorScheme.onError
-                            ) {
-                                Text("$runningCount")
-                            }
-                        }
+                        badge = { Badge { Text("$runningCount") } }
                     ) {
-                        Icon(
-                            Icons.Default.List,
-                            contentDescription = "Downloads",
-                            tint = if (currentDestination == "downloads")
-                                MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Icon(Icons.Default.List, "Downloads")
                     }
                 } else {
-                    Icon(
-                        Icons.Default.List,
-                        contentDescription = "Downloads",
-                        tint = if (currentDestination == "downloads")
-                            MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Icon(Icons.Default.List, "Downloads")
                 }
             },
-            label = {
-                Text(
-                    "Downloads",
-                    color = if (currentDestination == "downloads")
-                        MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            },
+            label = { Text("Downloads") },
             selected = currentDestination == "downloads",
             onClick = { onNavigate("downloads") }
         )
