@@ -32,6 +32,7 @@ class QualityPreferences(private val context: Context) {
         val SUBTITLE_FORMAT_KEY = stringPreferencesKey("subtitle_format")
         val CONVERT_SUBTITLES_KEY = booleanPreferencesKey("convert_subtitles")
         val DOWNLOAD_AUTO_CAPTIONS_KEY = booleanPreferencesKey("download_auto_captions")
+        val CUSTOM_SUBTITLE_LANGUAGES_KEY = stringPreferencesKey("custom_subtitle_languages")
 
         // Advanced Features
         val ENABLE_SPONSORS_BLOCK_KEY = booleanPreferencesKey("enable_sponsors_block")
@@ -76,13 +77,16 @@ class QualityPreferences(private val context: Context) {
         .map { preferences -> preferences[DOWNLOAD_SUBTITLES_KEY] ?: false }
 
     val subtitleFormat: Flow<String> = context.dataStore.data
-        .map { preferences -> preferences[SUBTITLE_FORMAT_KEY] ?: "srt" }
+        .map { preferences -> preferences[SUBTITLE_FORMAT_KEY] ?: "undefined" }
 
     val convertSubtitles: Flow<Boolean> = context.dataStore.data
         .map { preferences -> preferences[CONVERT_SUBTITLES_KEY] ?: false }
 
     val downloadAutoCaptions: Flow<Boolean> = context.dataStore.data
         .map { preferences -> preferences[DOWNLOAD_AUTO_CAPTIONS_KEY] ?: false }
+
+    val customSubtitleLanguages: Flow<String> = context.dataStore.data
+        .map { preferences -> preferences[CUSTOM_SUBTITLE_LANGUAGES_KEY] ?: "en,es,fr" }
 
     // Advanced Feature Flows
     val enableSponsorsBlock: Flow<Boolean> = context.dataStore.data
@@ -169,6 +173,12 @@ class QualityPreferences(private val context: Context) {
     suspend fun setDownloadAutoCaptions(enabled: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[DOWNLOAD_AUTO_CAPTIONS_KEY] = enabled
+        }
+    }
+
+    suspend fun setCustomSubtitleLanguages(languages: String) {
+        context.dataStore.edit { preferences ->
+            preferences[CUSTOM_SUBTITLE_LANGUAGES_KEY] = languages
         }
     }
 

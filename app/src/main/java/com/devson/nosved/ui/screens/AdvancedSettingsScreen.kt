@@ -1,16 +1,19 @@
 package com.devson.nosved.ui.screens
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import com.devson.nosved.data.*
 import kotlinx.coroutines.launch
@@ -26,7 +29,7 @@ fun AdvancedSettingsScreen(
 
     // Collect advanced preferences
     val downloadSubtitles by qualityPrefs.downloadSubtitles.collectAsState(initial = false)
-    val subtitleFormat by qualityPrefs.subtitleFormat.collectAsState(initial = "srt")
+    val subtitleFormat by qualityPrefs.subtitleFormat.collectAsState(initial = "undefined")
     val convertSubtitles by qualityPrefs.convertSubtitles.collectAsState(initial = false)
     val downloadAutoCaptions by qualityPrefs.downloadAutoCaptions.collectAsState(initial = false)
     val enableSponsorsBlock by qualityPrefs.enableSponsorsBlock.collectAsState(initial = false)
@@ -35,6 +38,11 @@ fun AdvancedSettingsScreen(
     val enableCookies by qualityPrefs.enableCookies.collectAsState(initial = false)
     val maxDownloadRetries by qualityPrefs.maxDownloadRetries.collectAsState(initial = 3)
     val preferredLanguage by qualityPrefs.preferredLanguage.collectAsState(initial = "en")
+    val customSubtitleLanguages by qualityPrefs.customSubtitleLanguages.collectAsState(initial = "en,es,fr")
+
+    // Dialog states
+    var showLanguageDialog by remember { mutableStateOf(false) }
+    var tempLanguageInput by remember { mutableStateOf("") }
 
     Scaffold(
         topBar = {
@@ -83,6 +91,38 @@ fun AdvancedSettingsScreen(
                         )
 
                         if (downloadSubtitles) {
+                            // Custom Subtitle Languages Input
+                            Column {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = "Subtitle Languages",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                        Text(
+                                            text = "Current: $customSubtitleLanguages",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    TextButton(
+                                        onClick = {
+                                            tempLanguageInput = customSubtitleLanguages
+                                            showLanguageDialog = true
+                                        }
+                                    ) {
+                                        Text("Edit")
+                                    }
+                                }
+                            }
+
+                            Divider(modifier = Modifier.padding(vertical = 8.dp))
+
                             // Subtitle Format Selection
                             Column {
                                 Text(
@@ -92,19 +132,25 @@ fun AdvancedSettingsScreen(
                                     modifier = Modifier.padding(bottom = 8.dp)
                                 )
 
+                                // First row with Undefined option
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    SubtitleFormatChips.forEach { format ->
-                                        FilterChip(
-                                            selected = subtitleFormat == format.value,
-                                            onClick = { scope.launch { qualityPrefs.setSubtitleFormat(format.value) } },
-                                            label = { Text(format.label) },
-                                            modifier = Modifier.weight(1f)
-                                        )
-                                    }
+                                    FilterChip(
+                                        selected = subtitleFormat == "undefined",
+                                        onClick = { scope.launch { qualityPrefs.setSubtitleFormat("undefined") } },
+                                        label = { Text("Undefined") },
+                                        modifier = Modifier.weight(1f)
+                                    )
                                 }
+
+                                Text(
+                                    text = "Undefined: Download in original format provided by YouTube",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(vertical = 4.dp)
+                                )
                             }
 
                             // Convert Subtitles Toggle
@@ -114,6 +160,32 @@ fun AdvancedSettingsScreen(
                                 checked = convertSubtitles,
                                 onToggle = { scope.launch { qualityPrefs.setConvertSubtitles(it) } }
                             )
+
+                            // Show format selection only when convert is enabled
+                            if (convertSubtitles) {
+                                Column {
+                                    Text(
+                                        "Convert To Format",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Medium,
+                                        modifier = Modifier.padding(bottom = 8.dp)
+                                    )
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        ConvertableSubtitleFormats.forEach { format ->
+                                            FilterChip(
+                                                selected = subtitleFormat == format.value && convertSubtitles,
+                                                onClick = { scope.launch { qualityPrefs.setSubtitleFormat(format.value) } },
+                                                label = { Text(format.label) },
+                                                modifier = Modifier.weight(1f)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
                         }
 
                         // Download Auto Captions Toggle
@@ -249,6 +321,70 @@ fun AdvancedSettingsScreen(
             }
         }
     }
+
+    // Language Input Dialog
+    if (showLanguageDialog) {
+        AlertDialog(
+            onDismissRequest = { showLanguageDialog = false },
+            title = {
+                Text("Subtitle Languages")
+            },
+            text = {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = "Enter language codes separated by commas (e.g., en,es,fr,de,ja,ko)",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+
+                    OutlinedTextField(
+                        value = tempLanguageInput,
+                        onValueChange = { tempLanguageInput = it },
+                        label = { Text("Language codes") },
+                        placeholder = { Text("en,es,fr") },
+                        modifier = Modifier.fillMaxWidth(),
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(
+                            onDone = {
+                                if (tempLanguageInput.isNotBlank()) {
+                                    scope.launch {
+                                        qualityPrefs.setCustomSubtitleLanguages(tempLanguageInput)
+                                    }
+                                    showLanguageDialog = false
+                                }
+                            }
+                        )
+                    )
+
+                    Text(
+                        text = "Common codes: en (English), es (Spanish), fr (French), de (German), ja (Japanese), ko (Korean), pt (Portuguese), it (Italian), ru (Russian), zh (Chinese)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        if (tempLanguageInput.isNotBlank()) {
+                            scope.launch {
+                                qualityPrefs.setCustomSubtitleLanguages(tempLanguageInput)
+                            }
+                            showLanguageDialog = false
+                        }
+                    }
+                ) {
+                    Text("Confirm")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLanguageDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -282,11 +418,12 @@ fun AdvancedSettingRow(
     }
 }
 
-// Subtitle format options
-val SubtitleFormatChips = listOf(
+// Convertable subtitle format options (shown only when convert is enabled)
+val ConvertableSubtitleFormats = listOf(
     QualityOption("SRT", "srt"),
     QualityOption("VTT", "vtt"),
-    QualityOption("ASS", "ass")
+    QualityOption("ASS", "ass"),
+    QualityOption("LRC", "lrc")
 )
 
 // Preferred language options

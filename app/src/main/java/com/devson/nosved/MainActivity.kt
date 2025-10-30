@@ -97,29 +97,36 @@ fun MainContent(viewModel: MainViewModel) {
         }
     }
 
+    // Define which screens should show top bar
+    val showTopBar = when (currentDestination) {
+        "home" -> true
+        "video_info" -> true
+        else -> false // Don't show top bar for downloads, settings, etc.
+    }
+
     Scaffold(
         topBar = {
-            // Only show top bar on Home page
-            if (currentDestination == "home") {
-                OptimizedTopBar(
-                    onNavigateToDownloads = {
-                        navController.navigate("downloads") { launchSingleTop = true }
-                    },
-                    onNavigateToSettings = {
-                        navController.navigate("settings") { launchSingleTop = true }
-                    },
-                    viewModel = viewModel
-                )
-            } else if (currentDestination == "video_info") {
-                // Simple back navigation for video info
-                TopAppBar(
-                    title = { Text("Video Details") },
-                    navigationIcon = {
-                        IconButton(onClick = { navController.navigateUp() }) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
-                        }
+            // Conditional top bar without animation
+            if (showTopBar) {
+                when (currentDestination) {
+                    "home" -> {
+                        HomeTopBar(
+                            onNavigateToDownloads = {
+                                navController.navigate("downloads") { launchSingleTop = true }
+                            },
+                            onNavigateToSettings = {
+                                navController.navigate("settings") { launchSingleTop = true }
+                            },
+                            viewModel = viewModel
+                        )
                     }
-                )
+                    "video_info" -> {
+                        SimpleTopBar(
+                            title = "Video Details",
+                            onNavigateUp = { navController.navigateUp() }
+                        )
+                    }
+                }
             }
         },
         bottomBar = {
@@ -144,30 +151,11 @@ fun MainContent(viewModel: MainViewModel) {
             navController = navController,
             startDestination = "home",
             modifier = Modifier.padding(innerPadding),
-            enterTransition = {
-                slideIntoContainer(
-                    towards = AnimatedContentTransitionScope.SlideDirection.Left,
-                    animationSpec = tween(200, easing = EaseOutCubic)
-                ) + fadeIn(animationSpec = tween(200))
-            },
-            exitTransition = {
-                slideOutOfContainer(
-                    towards = AnimatedContentTransitionScope.SlideDirection.Left,
-                    animationSpec = tween(200, easing = EaseInCubic)
-                ) + fadeOut(animationSpec = tween(200))
-            },
-            popEnterTransition = {
-                slideIntoContainer(
-                    towards = AnimatedContentTransitionScope.SlideDirection.Right,
-                    animationSpec = tween(200, easing = EaseOutCubic)
-                ) + fadeIn(animationSpec = tween(200))
-            },
-            popExitTransition = {
-                slideOutOfContainer(
-                    towards = AnimatedContentTransitionScope.SlideDirection.Right,
-                    animationSpec = tween(200, easing = EaseInCubic)
-                ) + fadeOut(animationSpec = tween(200))
-            }
+            // Removed animations for smoother transitions
+            enterTransition = { EnterTransition.None },
+            exitTransition = { ExitTransition.None },
+            popEnterTransition = { EnterTransition.None },
+            popExitTransition = { ExitTransition.None }
         ) {
             composable("home") {
                 HomeScreen(viewModel = viewModel, navController = navController)
@@ -197,7 +185,7 @@ fun MainContent(viewModel: MainViewModel) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun OptimizedTopBar(
+fun HomeTopBar(
     onNavigateToDownloads: () -> Unit,
     onNavigateToSettings: () -> Unit,
     viewModel: MainViewModel
@@ -233,6 +221,22 @@ fun OptimizedTopBar(
                 onNavigateToSettings = onNavigateToSettings,
                 viewModel = viewModel
             )
+        }
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SimpleTopBar(
+    title: String,
+    onNavigateUp: () -> Unit
+) {
+    TopAppBar(
+        title = { Text(title) },
+        navigationIcon = {
+            IconButton(onClick = onNavigateUp) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+            }
         }
     )
 }
