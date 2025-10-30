@@ -294,9 +294,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val downloadDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
                 val nosvedDir = File(downloadDir, "nosved")
                 if (!nosvedDir.exists()) nosvedDir.mkdirs()
-                val sanitizedTitle = titleToUse.replace("[^a-zA-Z0-9.-]".toRegex(), "_")
+
+                // Simple file naming - clean but readable
+                val sanitizedTitle = titleToUse
+                    .replace(Regex("[^a-zA-Z0-9\\s.-]"), "") // Remove special chars but keep spaces, dots, hyphens
+                    .replace(Regex("\\s+"), " ") // Replace multiple spaces with single space
+                    .trim()
+                    .take(100) // Limit length to prevent issues
+
                 val fileName = "${sanitizedTitle}.%(ext)s"
                 val filePath = File(nosvedDir, "${sanitizedTitle}.mp4")
+
                 val request = YoutubeDLRequest(videoInfo.webpageUrl ?: "")
                 request.addOption("-o", File(nosvedDir, fileName).absolutePath)
                 request.addOption("-f", "${videoFormat.formatId}+${audioFormat.formatId}/best")
@@ -328,7 +336,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     downloadDao.getDownloadById(downloadId)?.copy(
                         status = DownloadStatus.COMPLETED,
                         filePath = filePath.absolutePath,
-                        fileName = fileName.replace(".%(ext)s", ".mp4"),
+                        fileName = "${sanitizedTitle}.mp4", // Simple naming
                         completedAt = System.currentTimeMillis(),
                         progress = 100
                     ) ?: return@withContext
@@ -383,7 +391,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val downloadDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
                 val nosvedDir = File(downloadDir, "nosved")
                 if (!nosvedDir.exists()) nosvedDir.mkdirs()
-                val sanitizedTitle = titleToUse.replace("[^a-zA-Z0-9.-]".toRegex(), "_")
+
+                // Simple file naming - clean but readable
+                val sanitizedTitle = titleToUse
+                    .replace(Regex("[^a-zA-Z0-9\\s.-]"), "") // Remove special chars but keep spaces, dots, hyphens
+                    .replace(Regex("\\s+"), " ") // Replace multiple spaces with single space
+                    .trim()
+                    .take(100) // Limit length to prevent issues
+
                 val fileName = "${sanitizedTitle}.%(ext)s"
                 val audioExtension = audioFormat.ext ?: "mp3"
                 val filePath = File(nosvedDir, "${sanitizedTitle}.${audioExtension}")
@@ -415,7 +430,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     downloadDao.getDownloadById(downloadId)?.copy(
                         status = DownloadStatus.COMPLETED,
                         filePath = filePath.absolutePath,
-                        fileName = "${sanitizedTitle}.${audioExtension}",
+                        fileName = "${sanitizedTitle}.${audioExtension}", // Simple naming
                         completedAt = System.currentTimeMillis(),
                         progress = 100
                     ) ?: return@withContext

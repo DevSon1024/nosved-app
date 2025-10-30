@@ -15,6 +15,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.devson.nosved.MainViewModel
 import com.devson.nosved.data.DownloadMode
@@ -22,6 +23,7 @@ import com.devson.nosved.data.QualityPreferences
 import com.devson.nosved.ui.components.QualitySelectionDialog
 import com.devson.nosved.ui.FormatSelectionSheet
 import com.yausername.youtubedl_android.mapper.VideoFormat
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun VideoInfoScreen(
@@ -42,6 +44,7 @@ fun VideoInfoScreen(
 
     // State for the editable title
     var customTitle by remember(videoInfo) { mutableStateOf(videoInfo?.title ?: "") }
+    var isEditingTitle by remember { mutableStateOf(false) }
 
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
@@ -79,52 +82,92 @@ fun VideoInfoScreen(
             ) {
                 item { Spacer(modifier = Modifier.height(8.dp)) }
 
-                // Enhanced Thumbnail with overlay
+                // Enhanced Thumbnail with better positioning
                 item {
                     Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
-                        shape = RoundedCornerShape(16.dp)
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(16f / 9f), // Better aspect ratio for thumbnails
+                        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
+                        shape = RoundedCornerShape(12.dp)
                     ) {
                         AsyncImage(
                             model = info.thumbnail,
                             contentDescription = "Video Thumbnail",
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .height(240.dp)
-                                .clip(RoundedCornerShape(16.dp)),
+                                .fillMaxSize()
+                                .clip(RoundedCornerShape(12.dp)),
                             contentScale = ContentScale.Crop
                         )
                     }
                 }
 
-                // Video Information Card
+                // Video Information Card with Editable Title
                 item {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
                         ),
                         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
                     ) {
                         Column(
-                            modifier = Modifier.padding(20.dp),
-                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                            modifier = Modifier.padding(18.dp),
+                            verticalArrangement = Arrangement.spacedBy(14.dp)
                         ) {
-                            // Title - NOW EDITABLE
-                            OutlinedTextField(
-                                value = customTitle,
-                                onValueChange = { customTitle = it },
-                                label = { Text("Download Title") },
+                            // Editable Title with smaller font
+                            Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                singleLine = true,
-                                textStyle = MaterialTheme.typography.headlineSmall.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                            )
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                if (isEditingTitle) {
+                                    OutlinedTextField(
+                                        value = customTitle,
+                                        onValueChange = { customTitle = it },
+                                        modifier = Modifier.weight(1f),
+                                        singleLine = false,
+                                        maxLines = 3,
+                                        textStyle = MaterialTheme.typography.titleMedium.copy(
+                                            fontSize = 16.sp, // Decreased font size
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    IconButton(
+                                        onClick = { isEditingTitle = false }
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Check,
+                                            contentDescription = "Save Title",
+                                            tint = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                } else {
+                                    Text(
+                                        text = customTitle,
+                                        style = MaterialTheme.typography.titleMedium.copy(
+                                            fontSize = 16.sp, // Decreased font size
+                                            fontWeight = FontWeight.SemiBold
+                                        ),
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    IconButton(
+                                        onClick = { isEditingTitle = true }
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Edit,
+                                            contentDescription = "Edit Title",
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                }
+                            }
 
-                            // Video Stats
+                            Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+
+                            // Video Stats with smaller fonts
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -133,14 +176,18 @@ fun VideoInfoScreen(
                                 Column {
                                     Text(
                                         text = "📺 ${info.uploader ?: "Unknown"}",
-                                        style = MaterialTheme.typography.bodyLarge,
+                                        style = MaterialTheme.typography.bodyMedium.copy(
+                                            fontSize = 14.sp // Decreased font size
+                                        ),
                                         fontWeight = FontWeight.Medium,
                                         color = MaterialTheme.colorScheme.onSurface
                                     )
 
                                     Text(
                                         text = "⏱️ ${formatDuration(info.duration)}",
-                                        style = MaterialTheme.typography.bodyMedium,
+                                        style = MaterialTheme.typography.bodySmall.copy(
+                                            fontSize = 12.sp // Decreased font size
+                                        ),
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
@@ -151,12 +198,16 @@ fun VideoInfoScreen(
                                     ) {
                                         Text(
                                             text = "Views",
-                                            style = MaterialTheme.typography.bodySmall,
+                                            style = MaterialTheme.typography.bodySmall.copy(
+                                                fontSize = 11.sp // Decreased font size
+                                            ),
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                         Text(
                                             text = formatViewCount(views),
-                                            style = MaterialTheme.typography.headlineSmall,
+                                            style = MaterialTheme.typography.titleMedium.copy(
+                                                fontSize = 16.sp // Decreased font size
+                                            ),
                                             fontWeight = FontWeight.Bold,
                                             color = MaterialTheme.colorScheme.primary
                                         )
@@ -167,18 +218,18 @@ fun VideoInfoScreen(
                     }
                 }
 
-                // Quality Selection Card (New Seal-like interface)
+                // Quality Selection Card with better layout
                 item {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
+                            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
                         ),
                         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
                     ) {
                         Column(
-                            modifier = Modifier.padding(20.dp),
-                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                            modifier = Modifier.padding(18.dp),
+                            verticalArrangement = Arrangement.spacedBy(14.dp)
                         ) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically
@@ -187,27 +238,34 @@ fun VideoInfoScreen(
                                     imageVector = Icons.Default.Tune,
                                     contentDescription = null,
                                     tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(24.dp)
+                                    modifier = Modifier.size(22.dp)
                                 )
-                                Spacer(modifier = Modifier.width(12.dp))
+                                Spacer(modifier = Modifier.width(10.dp))
                                 Text(
                                     text = "Download Quality",
-                                    style = MaterialTheme.typography.titleLarge,
+                                    style = MaterialTheme.typography.titleMedium.copy(
+                                        fontSize = 17.sp // Decreased font size
+                                    ),
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onPrimaryContainer
                                 )
                             }
 
-                            // Download Mode Selection
+                            // Download Mode Selection with better spacing
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
                                 // Video + Audio Button
                                 ElevatedFilterChip(
                                     selected = selectedDownloadMode == DownloadMode.VIDEO_AUDIO,
                                     onClick = { selectedDownloadMode = DownloadMode.VIDEO_AUDIO },
-                                    label = { Text("Video + Audio") },
+                                    label = {
+                                        Text(
+                                            "Video + Audio",
+                                            fontSize = 13.sp // Decreased font size
+                                        )
+                                    },
                                     modifier = Modifier.weight(1f)
                                 )
 
@@ -215,16 +273,21 @@ fun VideoInfoScreen(
                                 ElevatedFilterChip(
                                     selected = selectedDownloadMode == DownloadMode.AUDIO_ONLY,
                                     onClick = { selectedDownloadMode = DownloadMode.AUDIO_ONLY },
-                                    label = { Text("Audio Only") },
+                                    label = {
+                                        Text(
+                                            "Audio Only",
+                                            fontSize = 13.sp // Decreased font size
+                                        )
+                                    },
                                     modifier = Modifier.weight(1f)
                                 )
                             }
 
-                            // Show current selection preview
+                            // Show current selection preview with smaller fonts
                             if (selectedDownloadMode == DownloadMode.VIDEO_AUDIO) {
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                                 ) {
                                     // Video Quality Preview
                                     Card(
@@ -234,17 +297,21 @@ fun VideoInfoScreen(
                                         )
                                     ) {
                                         Column(
-                                            modifier = Modifier.padding(12.dp),
+                                            modifier = Modifier.padding(10.dp),
                                             horizontalAlignment = Alignment.CenterHorizontally
                                         ) {
                                             Text(
                                                 text = "📹 Video",
-                                                style = MaterialTheme.typography.bodySmall,
+                                                style = MaterialTheme.typography.bodySmall.copy(
+                                                    fontSize = 11.sp // Decreased font size
+                                                ),
                                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                                             )
                                             Text(
                                                 text = defaultVideoQuality,
-                                                style = MaterialTheme.typography.titleMedium,
+                                                style = MaterialTheme.typography.titleSmall.copy(
+                                                    fontSize = 14.sp // Decreased font size
+                                                ),
                                                 fontWeight = FontWeight.Bold
                                             )
                                         }
@@ -258,17 +325,21 @@ fun VideoInfoScreen(
                                         )
                                     ) {
                                         Column(
-                                            modifier = Modifier.padding(12.dp),
+                                            modifier = Modifier.padding(10.dp),
                                             horizontalAlignment = Alignment.CenterHorizontally
                                         ) {
                                             Text(
                                                 text = "🎵 Audio",
-                                                style = MaterialTheme.typography.bodySmall,
+                                                style = MaterialTheme.typography.bodySmall.copy(
+                                                    fontSize = 11.sp // Decreased font size
+                                                ),
                                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                                             )
                                             Text(
                                                 text = defaultAudioQuality,
-                                                style = MaterialTheme.typography.titleMedium,
+                                                style = MaterialTheme.typography.titleSmall.copy(
+                                                    fontSize = 14.sp // Decreased font size
+                                                ),
                                                 fontWeight = FontWeight.Bold
                                             )
                                         }
@@ -282,17 +353,21 @@ fun VideoInfoScreen(
                                     )
                                 ) {
                                     Column(
-                                        modifier = Modifier.padding(12.dp),
+                                        modifier = Modifier.padding(10.dp),
                                         horizontalAlignment = Alignment.CenterHorizontally
                                     ) {
                                         Text(
                                             text = "🎵 Audio Only",
-                                            style = MaterialTheme.typography.bodySmall,
+                                            style = MaterialTheme.typography.bodySmall.copy(
+                                                fontSize = 11.sp // Decreased font size
+                                            ),
                                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                                         )
                                         Text(
                                             text = defaultAudioQuality,
-                                            style = MaterialTheme.typography.titleMedium,
+                                            style = MaterialTheme.typography.titleSmall.copy(
+                                                fontSize = 14.sp // Decreased font size
+                                            ),
                                             fontWeight = FontWeight.Bold
                                         )
                                     }
@@ -305,7 +380,7 @@ fun VideoInfoScreen(
                 item { Spacer(modifier = Modifier.height(100.dp)) }
             }
 
-            // Bottom Action Buttons
+            // Bottom Action Buttons - New Layout: Change Quality | Advance Formats on top, Download full width below
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 color = MaterialTheme.colorScheme.surface,
@@ -315,17 +390,47 @@ fun VideoInfoScreen(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    // Quality Settings Button
-                    OutlinedButton(
-                        onClick = { showQualityDialog = true },
-                        modifier = Modifier.fillMaxWidth()
+                    // Top Row: Change Quality and Advance Formats side by side
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Icon(Icons.Default.Tune, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Change Quality Settings")
+                        // Change Quality Settings Button
+                        OutlinedButton(
+                            onClick = { showQualityDialog = true },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(
+                                Icons.Default.Tune,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                "Change Quality",
+                                fontSize = 13.sp // Decreased font size
+                            )
+                        }
+
+                        // Advance Formats Button (renamed from Advanced Format Selection)
+                        OutlinedButton(
+                            onClick = { showAdvancedSheet = true },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(
+                                Icons.Default.Settings,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                "Advance Format",
+                                fontSize = 13.sp // Decreased font size
+                            )
+                        }
                     }
 
-                    // Download Button
+                    // Bottom Row: Full width Download button
                     Button(
                         onClick = {
                             viewModel.downloadVideoWithQuality(
@@ -373,7 +478,7 @@ fun VideoInfoScreen(
             )
         }
 
-        // Advanced Format Selection Sheet (Original)
+        // Advanced Format Selection Sheet
         if (showAdvancedSheet) {
             ModalBottomSheet(
                 onDismissRequest = { showAdvancedSheet = false },
@@ -398,7 +503,7 @@ fun VideoInfoScreen(
                         val videoFormat = selectedVideoFormat
                         val audioFormat = selectedAudioFormat
                         if (videoFormat != null && audioFormat != null) {
-                            viewModel.downloadVideo(info, videoFormat, audioFormat, customTitle) // Pass customTitle
+                            viewModel.downloadVideo(info, videoFormat, audioFormat, customTitle)
                             showAdvancedSheet = false
                             onBack()
                         }
@@ -409,7 +514,7 @@ fun VideoInfoScreen(
     }
 }
 
-// Helper functions remain the same...
+// Helper functions with same implementation
 private fun formatDuration(duration: Int?): String {
     if (duration == null) return "Unknown"
 
