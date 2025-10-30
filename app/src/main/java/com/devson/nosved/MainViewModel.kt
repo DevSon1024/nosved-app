@@ -3,16 +3,16 @@ package com.devson.nosved
 import android.app.Application
 import android.content.ClipboardManager
 import android.content.Context
-import android.os.Environment
 import android.util.Log
 import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.devson.nosved.data.*
+import com.devson.nosved.download.DownloadRepository
+import com.devson.nosved.download.DownloadService
 import com.devson.nosved.util.VideoInfoUtil
 import com.yausername.youtubedl_android.YoutubeDL
 import com.yausername.youtubedl_android.YoutubeDLException
-import com.yausername.youtubedl_android.YoutubeDLRequest
 import com.yausername.youtubedl_android.mapper.VideoFormat
 import com.yausername.youtubedl_android.mapper.VideoInfo
 import kotlinx.coroutines.*
@@ -24,7 +24,8 @@ import java.util.*
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val database = DownloadDatabase.getDatabase(application)
-    private val downloadDao = database.downloadDao()
+    // 1. Init Repository
+    private val downloadRepository = DownloadRepository(database.downloadDao())
     private val context = application.applicationContext
 
     private val _videoInfo = MutableStateFlow<VideoInfo?>(null)
@@ -47,12 +48,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val notificationHelper = NotificationHelper(application)
 
+    // 2. Init Service
+    private val downloadService = DownloadService(
+        context,
+        downloadRepository,
+        notificationHelper,
+        _downloadProgress,
+        viewModelScope
+    )
+
     private var currentFetchJob: Job? = null
 
-    val allDownloads = downloadDao.getAllDownloads()
-    val runningDownloads = downloadDao.getDownloadsByStatus(DownloadStatus.DOWNLOADING)
-    val completedDownloads = downloadDao.getDownloadsByStatus(DownloadStatus.COMPLETED)
-    val failedDownloads = downloadDao.getDownloadsByStatus(DownloadStatus.FAILED)
+    // 3. Get flows from repository
+    val allDownloads = downloadRepository.allDownloads
+    val runningDownloads = downloadRepository.runningDownloads
+    val completedDownloads = downloadRepository.completedDownloads
+    val failedDownloads = downloadRepository.failedDownloads
 
     init {
         notificationHelper.createNotificationChannel()
@@ -65,6 +76,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         currentFetchJob?.cancel()
     }
 
+    // This function is just for URL state management, it's fine
     private fun isValidUrl(url: String): Boolean {
         return url.startsWith("http://") || url.startsWith("https://") ||
                 url.contains("youtube.com") || url.contains("youtu.be") ||
@@ -72,6 +84,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 url.contains("twitter.com") || url.contains("facebook.com")
     }
 
+    // This is UI logic, keep it
     fun clearUrl() {
         currentFetchJob?.cancel()
         VideoInfoUtil.cancelFetch(_currentUrl.value)
@@ -81,6 +94,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _selectedAudioFormat.value = null
     }
 
+    // This is info-fetching logic, not download execution. Keep it.
     fun fetchVideoInfo(url: String) {
         currentFetchJob?.cancel()
         VideoInfoUtil.cancelFetch(url)
@@ -124,6 +138,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    // This is UI logic, keep it
     private suspend fun setDefaultFormatsOptimized(info: VideoInfo) {
         withContext(Dispatchers.Default) {
             try {
@@ -147,6 +162,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    // These are UI state logic, keep them
     fun selectVideoFormat(format: VideoFormat) {
         _selectedVideoFormat.value = format
     }
@@ -154,6 +170,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun selectAudioFormat(format: VideoFormat) {
         _selectedAudioFormat.value = format
     }
+
+    // This logic is about *selecting* quality, not executing download. Keep it.
     private fun findNearestAudioFormat(
         formats: List<VideoFormat>,
         preferredBitrate: Int,
@@ -175,12 +193,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         return candidates.maxByOrNull { it.abr ?: 0 }
     }
 
-    /**
-     * Finds the best video format by requiring:
-     * - Matching container
-     * - Equal or lower than the preferred height, but as high as possible
-     * - If nothing, picks lowest of that container only
-     */
     private fun findNearestVideoFormat(
         formats: List<VideoFormat>,
         preferredHeight: Int,
@@ -198,6 +210,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         return candidates.maxByOrNull { it.height ?: 0 }
     }
 
+    private fun parseQualityFromString(q: String): Int {
+        return q.lowercase(Locale.ROOT)
+            .replace("p", "")
+            .replace("kbps", "")
+            .trim()
+            .toIntOrNull() ?: 0
+    }
+
+
+    // === 4. REFACTORED DOWNLOAD FUNCTIONS ===
+
+    /**
+     * This function now delegates the actual download to the DownloadService.
+     */
     fun downloadVideoWithQuality(
         videoInfo: VideoInfo,
         customTitle: String,
@@ -207,32 +233,33 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         preferredAudioContainer: String = "m4a",
         preferredVideoContainer: String = "mp4"
     ) {
-        viewModelScope.launch (Dispatchers.IO){
+        viewModelScope.launch (Dispatchers.IO) {
             val formats = videoInfo.formats ?: return@launch
 
             val targetVideoHeight = parseQualityFromString(preferredVideoQuality)
             val targetAudioBitrate = parseQualityFromString(preferredAudioQuality)
 
-            var selectedVideo: VideoFormat? = null
-            var selectedAudio: VideoFormat? = null
-
             when (downloadMode) {
                 DownloadMode.AUDIO_ONLY -> {
-                    selectedAudio = findNearestAudioFormat(formats, targetAudioBitrate, preferredAudioContainer)
+                    val selectedAudio = findNearestAudioFormat(formats, targetAudioBitrate, preferredAudioContainer)
                         ?: findNearestAudioFormat(formats, targetAudioBitrate, "webm")
+
                     if (selectedAudio != null) {
-                        downloadAudioOnly(videoInfo, selectedAudio, customTitle)
+                        // Delegate to service
+                        downloadService.startAudioDownload(videoInfo, selectedAudio, customTitle)
                         _selectedAudioFormat.value = selectedAudio
                         _selectedVideoFormat.value = null
                     } else showToast("❌ No suitable audio format found.")
                 }
                 DownloadMode.VIDEO_AUDIO -> {
-                    selectedVideo = findNearestVideoFormat(formats, targetVideoHeight, preferredVideoContainer)
+                    val selectedVideo = findNearestVideoFormat(formats, targetVideoHeight, preferredVideoContainer)
                         ?: findNearestVideoFormat(formats, targetVideoHeight, "webm")
-                    selectedAudio = findNearestAudioFormat(formats, targetAudioBitrate, preferredAudioContainer)
+                    val selectedAudio = findNearestAudioFormat(formats, targetAudioBitrate, preferredAudioContainer)
                         ?: findNearestAudioFormat(formats, targetAudioBitrate, "webm")
+
                     if (selectedVideo != null && selectedAudio != null) {
-                        downloadVideo(videoInfo, selectedVideo, selectedAudio, customTitle)
+                        // Delegate to service
+                        downloadService.startVideoDownload(videoInfo, selectedVideo, selectedAudio, customTitle)
                         _selectedVideoFormat.value = selectedVideo
                         _selectedAudioFormat.value = selectedAudio
                     } else showToast("❌ No suitable video/audio format found.")
@@ -241,216 +268,47 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private fun parseQualityFromString(q: String): Int {
-        // Fix: Use lowercase() instead of toLowerCase(Locale.ROOT)
-        return q.lowercase(Locale.ROOT)
-            .replace("p", "")
-            .replace("kbps", "")
-            .trim()
-            .toIntOrNull() ?: 0
-    }
-
-    // === DOWNLOAD FUNCTIONS ===
-
+    /**
+     * Deprecated: This function is replaced by downloadVideoWithQuality and delegates
+     * to DownloadService.startVideoDownload
+     */
     fun downloadVideo(videoInfo: VideoInfo, videoFormat: VideoFormat, audioFormat: VideoFormat, customTitle: String) {
-        viewModelScope.launch (Dispatchers.IO){
-            val downloadId = UUID.randomUUID().toString()
-            // Calculate the total size
-            val totalSize = (videoFormat.fileSize ?: 0L) + (audioFormat.fileSize ?: 0L)
-
-            val titleToUse = customTitle.ifBlank { videoInfo.title ?: "Unknown Title" }
-
-            val downloadEntity = DownloadEntity(
-                id = downloadId,
-                title = titleToUse,
-                url = videoInfo.webpageUrl ?: "",
-                thumbnail = videoInfo.thumbnail,
-                filePath = null,
-                fileName = null,
-                fileSize = if (totalSize > 0) totalSize else 0L,
-                status = DownloadStatus.QUEUED,
-                duration = videoInfo.duration?.toString(),
-                uploader = videoInfo.uploader,
-                videoFormat = "${videoFormat.height}p",
-                audioFormat = "${audioFormat.abr}kbps"
-            )
-            downloadDao.insertDownload(downloadEntity)
-            showToast("Download started: $titleToUse")
-            startDownload(downloadId, videoInfo, videoFormat, audioFormat, titleToUse)
+        viewModelScope.launch (Dispatchers.IO) {
+            downloadService.startVideoDownload(videoInfo, videoFormat, audioFormat, customTitle)
         }
     }
 
-    private suspend fun startDownload(
-        downloadId: String,
-        videoInfo: VideoInfo,
-        videoFormat: VideoFormat,
-        audioFormat: VideoFormat,
-        titleToUse: String
-    ) {
-        withContext(Dispatchers.IO) {
-            try {
-                clearYoutubeDLCache()
-                downloadDao.updateDownloadStatus(downloadId, DownloadStatus.DOWNLOADING)
-                val downloadDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-                val nosvedDir = File(downloadDir, "nosved")
-                if (!nosvedDir.exists()) nosvedDir.mkdirs()
-
-                // Simple file naming - clean but readable
-                val sanitizedTitle = titleToUse
-                    .replace(Regex("[^a-zA-Z0-9\\s.-]"), "") // Remove special chars but keep spaces, dots, hyphens
-                    .replace(Regex("\\s+"), " ") // Replace multiple spaces with single space
-                    .trim()
-                    .take(100) // Limit length to prevent issues
-
-                val fileName = "${sanitizedTitle}.%(ext)s"
-                val filePath = File(nosvedDir, "${sanitizedTitle}.mp4")
-
-                val request = YoutubeDLRequest(videoInfo.webpageUrl ?: "")
-                request.addOption("-o", File(nosvedDir, fileName).absolutePath)
-                request.addOption("-f", "${videoFormat.formatId}+${audioFormat.formatId}/best")
-                request.addOption("--merge-output-format", "mp4")
-                request.addOption("--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-                request.addOption("--referer", "https://www.youtube.com/")
-                request.addOption("--no-warnings")
-                request.addOption("--socket-timeout", "10")
-                request.addOption("--retries", "3")
-                request.addOption("--fragment-retries", "3")
-
-                YoutubeDL.getInstance().execute(request) { progress, _, line ->
-                    viewModelScope.launch(Dispatchers.IO) {
-                        val progressData = DownloadProgress(
-                            id = downloadId,
-                            progress = if (progress > 0) progress.toInt() else 0,
-                            downloadedSize = 0L,
-                            totalSize = videoFormat.fileSize ?: 0L,
-                            speed = extractSpeed(line),
-                            eta = extractETA(line)
-                        )
-                        _downloadProgress.value = _downloadProgress.value + (downloadId to progressData)
-                        downloadDao.updateDownloadProgress(downloadId, progressData.progress, 0L)
-                        notificationHelper.showDownloadProgressNotification(line)
-                    }
-                }
-
-                downloadDao.updateDownload(
-                    downloadDao.getDownloadById(downloadId)?.copy(
-                        status = DownloadStatus.COMPLETED,
-                        filePath = filePath.absolutePath,
-                        fileName = "${sanitizedTitle}.mp4", // Simple naming
-                        completedAt = System.currentTimeMillis(),
-                        progress = 100
-                    ) ?: return@withContext
-                )
-                showToast("✅ Download completed: $titleToUse")
-                notificationHelper.showDownloadCompleteNotification(titleToUse, filePath.absolutePath)
-            } catch (e: YoutubeDLException) {
-                showToast("❌ Download failed: ${e.message ?: ""}")
-                downloadDao.updateDownload(
-                    downloadDao.getDownloadById(downloadId)?.copy(
-                        status = DownloadStatus.FAILED,
-                        error = e.message
-                    ) ?: return@withContext
-                )
-            }
+    /**
+     * Delegate cancellation to the DownloadService.
+     */
+    fun cancelDownload(downloadId: String) {
+        viewModelScope.launch {
+            downloadService.cancelDownload(downloadId)
         }
     }
 
-    private suspend fun downloadAudioOnly(videoInfo: VideoInfo, audioFormat: VideoFormat, customTitle: String) {
-        val downloadId = UUID.randomUUID().toString()
-        val titleToUse = customTitle.ifBlank { videoInfo.title ?: "Unknown Title" }
-
-        val downloadEntity = DownloadEntity(
-            id = downloadId,
-            title = "${titleToUse} (Audio)",
-            url = videoInfo.webpageUrl ?: "",
-            thumbnail = videoInfo.thumbnail,
-            filePath = null,
-            fileName = null,
-            fileSize = audioFormat.fileSize ?: 0L,
-            status = DownloadStatus.QUEUED,
-            duration = videoInfo.duration?.toString(),
-            uploader = videoInfo.uploader,
-            videoFormat = "Audio Only",
-            audioFormat = "${audioFormat.abr}kbps"
-        )
-        downloadDao.insertDownload(downloadEntity)
-        showToast("Audio download started: $titleToUse")
-        startAudioDownload(downloadId, videoInfo, audioFormat, titleToUse)
-    }
-
-    private suspend fun startAudioDownload(
-        downloadId: String,
-        videoInfo: VideoInfo,
-        audioFormat: VideoFormat,
-        titleToUse: String
-    ) {
-        withContext(Dispatchers.IO) {
-            try {
-                clearYoutubeDLCache()
-                downloadDao.updateDownloadStatus(downloadId, DownloadStatus.DOWNLOADING)
-                val downloadDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-                val nosvedDir = File(downloadDir, "nosved")
-                if (!nosvedDir.exists()) nosvedDir.mkdirs()
-
-                // Simple file naming - clean but readable
-                val sanitizedTitle = titleToUse
-                    .replace(Regex("[^a-zA-Z0-9\\s.-]"), "") // Remove special chars but keep spaces, dots, hyphens
-                    .replace(Regex("\\s+"), " ") // Replace multiple spaces with single space
-                    .trim()
-                    .take(100) // Limit length to prevent issues
-
-                val fileName = "${sanitizedTitle}.%(ext)s"
-                val audioExtension = audioFormat.ext ?: "mp3"
-                val filePath = File(nosvedDir, "${sanitizedTitle}.${audioExtension}")
-
-                val request = YoutubeDLRequest(videoInfo.webpageUrl ?: "")
-                request.addOption("-o", File(nosvedDir, fileName).absolutePath)
-                request.addOption("-f", audioFormat.formatId ?: "bestaudio")
-                request.addOption("-x") // Extract audio
-                request.addOption("--audio-format", audioExtension)
-                request.addOption("--no-warnings")
-
-                YoutubeDL.getInstance().execute(request) { progress, _, line ->
-                    viewModelScope.launch(Dispatchers.IO) {
-                        val progressData = DownloadProgress(
-                            id = downloadId,
-                            progress = if (progress > 0) progress.toInt() else 0,
-                            downloadedSize = 0L,
-                            totalSize = audioFormat.fileSize ?: 0L,
-                            speed = extractSpeed(line),
-                            eta = extractETA(line)
-                        )
-                        _downloadProgress.value = _downloadProgress.value + (downloadId to progressData)
-                        downloadDao.updateDownloadProgress(downloadId, progressData.progress, 0L)
-                        notificationHelper.showDownloadProgressNotification(line)
-                    }
-                }
-
-                downloadDao.updateDownload(
-                    downloadDao.getDownloadById(downloadId)?.copy(
-                        status = DownloadStatus.COMPLETED,
-                        filePath = filePath.absolutePath,
-                        fileName = "${sanitizedTitle}.${audioExtension}", // Simple naming
-                        completedAt = System.currentTimeMillis(),
-                        progress = 100
-                    ) ?: return@withContext
-                )
-                showToast("✅ Audio download completed: $titleToUse")
-                notificationHelper.showDownloadCompleteNotification(
-                    "${titleToUse} (Audio)", filePath.absolutePath
-                )
-            } catch (e: Exception) {
-                showToast("❌ Audio download failed: ${e.message ?: ""}")
-                downloadDao.updateDownload(
-                    downloadDao.getDownloadById(downloadId)?.copy(
-                        status = DownloadStatus.FAILED,
-                        error = e.message
-                    ) ?: return@withContext
-                )
-            }
+    /**
+     * Delegate retry to the DownloadService.
+     */
+    fun retryDownload(downloadId: String) {
+        viewModelScope.launch {
+            downloadService.retryDownload(downloadId)
         }
     }
 
+    /**
+     * Delegate deletion to the DownloadService.
+     */
+    fun deleteDownload(downloadId: String) {
+        viewModelScope.launch {
+            downloadService.deleteDownload(downloadId)
+        }
+    }
+
+    // === END OF REFACTORED FUNCTIONS ===
+
+
+    // These are UI/Clipboard functions, keep them
     fun pasteUrlOnly(): String {
         return try {
             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
@@ -495,6 +353,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    // This is UI/Clipboard logic, keep it
     private fun isValidUrlQuick(url: String): Boolean {
         return (url.startsWith("http://") || url.startsWith("https://")) &&
                 (url.contains("youtube.com") || url.contains("youtu.be") ||
@@ -503,38 +362,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         url.contains("vimeo.com"))
     }
 
-    fun cancelDownload(downloadId: String) {
-        viewModelScope.launch (Dispatchers.IO) {
-            val download = downloadDao.getDownloadById(downloadId)
-            downloadDao.updateDownloadStatus(downloadId, DownloadStatus.CANCELLED)
-            _downloadProgress.value = _downloadProgress.value - downloadId
-            download?.let { showToast("Download cancelled: ${it.title}") }
-        }
-    }
-
-    fun retryDownload(downloadId: String) {
-        viewModelScope.launch (Dispatchers.IO){
-            val download = downloadDao.getDownloadById(downloadId)
-            if (download != null && download.status == DownloadStatus.FAILED) {
-                downloadDao.updateDownloadStatus(downloadId, DownloadStatus.QUEUED)
-                showToast("Retrying download: ${download.title}")
-            }
-        }
-    }
-
-    fun deleteDownload(downloadId: String) {
-        viewModelScope.launch(Dispatchers.IO) {
-            val download = downloadDao.getDownloadById(downloadId)
-            download?.let {
-                it.filePath?.let { path ->
-                    val file = File(path)
-                    if (file.exists()) file.delete()
-                }
-                downloadDao.deleteDownloadById(downloadId)
-                showToast("Download deleted: ${it.title}")
-            }
-        }
-    }
 
     override fun onCleared() {
         super.onCleared()
@@ -548,16 +375,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private fun extractSpeed(line: String): String {
-        val speedRegex = "([0-9.]+[KMG]iB/s)".toRegex()
-        return speedRegex.find(line)?.value ?: ""
-    }
+    // These helpers are now in DownloadUtils.kt
 
-    private fun extractETA(line: String): String {
-        val etaRegex = "ETA ([0-9:]+)".toRegex()
-        return etaRegex.find(line)?.groupValues?.get(1) ?: ""
-    }
-
+    // These are fine to keep
     private fun initializeYoutubeDLLikeSeal() {
         viewModelScope.launch(Dispatchers.IO) {
             try {
