@@ -12,20 +12,15 @@ import androidx.activity.viewModels
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
-import androidx.navigation.NavHostController
 import androidx.navigation.compose.*
 import com.devson.nosved.ui.theme.NosvedTheme
 import com.devson.nosved.ui.screens.*
@@ -79,7 +74,6 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainContent(viewModel: MainViewModel) {
     val navController = rememberNavController()
@@ -97,41 +91,10 @@ fun MainContent(viewModel: MainViewModel) {
         }
     }
 
-    // Define which screens should show top bar
-    val showTopBar = when (currentDestination) {
-        "home" -> true
-        "video_info" -> true
-        else -> false // Don't show top bar for downloads, settings, etc.
-    }
-
     Scaffold(
-        topBar = {
-            // Conditional top bar without animation
-            if (showTopBar) {
-                when (currentDestination) {
-                    "home" -> {
-                        HomeTopBar(
-                            onNavigateToDownloads = {
-                                navController.navigate("downloads") { launchSingleTop = true }
-                            },
-                            onNavigateToSettings = {
-                                navController.navigate("settings") { launchSingleTop = true }
-                            },
-                            viewModel = viewModel
-                        )
-                    }
-                    "video_info" -> {
-                        SimpleTopBar(
-                            title = "Video Details",
-                            onNavigateUp = { navController.navigateUp() }
-                        )
-                    }
-                }
-            }
-        },
         bottomBar = {
             if (currentDestination != "video_info") {
-                OptimizedBottomNavigation(
+                ModernBottomNavigation(
                     currentDestination = currentDestination,
                     onNavigate = { route ->
                         if (currentDestination != route) {
@@ -151,17 +114,87 @@ fun MainContent(viewModel: MainViewModel) {
             navController = navController,
             startDestination = "home",
             modifier = Modifier.padding(innerPadding),
-            // Removed animations for smoother transitions
-            enterTransition = { EnterTransition.None },
-            exitTransition = { ExitTransition.None },
-            popEnterTransition = { EnterTransition.None },
-            popExitTransition = { ExitTransition.None }
+            // Modern lightweight animations
+            enterTransition = {
+                when (targetState.destination.route) {
+                    "home" -> slideInHorizontally(
+                        initialOffsetX = { -it / 3 },
+                        animationSpec = tween(250, easing = FastOutSlowInEasing)
+                    ) + fadeIn(animationSpec = tween(200, 50))
+
+                    "video_info" -> slideInVertically(
+                        initialOffsetY = { it / 4 },
+                        animationSpec = tween(300, easing = FastOutSlowInEasing)
+                    ) + fadeIn(animationSpec = tween(200))
+
+                    else -> fadeIn(animationSpec = tween(200)) + scaleIn(
+                        initialScale = 0.95f,
+                        animationSpec = tween(200, easing = FastOutSlowInEasing)
+                    )
+                }
+            },
+            exitTransition = {
+                when (initialState.destination.route) {
+                    "home" -> slideOutHorizontally(
+                        targetOffsetX = { -it / 3 },
+                        animationSpec = tween(200, easing = FastOutLinearInEasing)
+                    ) + fadeOut(animationSpec = tween(150))
+
+                    "video_info" -> slideOutVertically(
+                        targetOffsetY = { it / 4 },
+                        animationSpec = tween(250, easing = FastOutLinearInEasing)
+                    ) + fadeOut(animationSpec = tween(150))
+
+                    else -> fadeOut(animationSpec = tween(150)) + scaleOut(
+                        targetScale = 0.95f,
+                        animationSpec = tween(150, easing = FastOutLinearInEasing)
+                    )
+                }
+            },
+            popEnterTransition = {
+                when (targetState.destination.route) {
+                    "home" -> slideInHorizontally(
+                        initialOffsetX = { -it / 3 },
+                        animationSpec = tween(250, easing = FastOutSlowInEasing)
+                    ) + fadeIn(animationSpec = tween(200, 50))
+
+                    else -> fadeIn(animationSpec = tween(200)) + scaleIn(
+                        initialScale = 0.98f,
+                        animationSpec = tween(200, easing = FastOutSlowInEasing)
+                    )
+                }
+            },
+            popExitTransition = {
+                when (initialState.destination.route) {
+                    "video_info" -> slideOutVertically(
+                        targetOffsetY = { it / 4 },
+                        animationSpec = tween(250, easing = FastOutLinearInEasing)
+                    ) + fadeOut(animationSpec = tween(150))
+
+                    else -> fadeOut(animationSpec = tween(150)) + scaleOut(
+                        targetScale = 0.98f,
+                        animationSpec = tween(150, easing = FastOutLinearInEasing)
+                    )
+                }
+            }
         ) {
             composable("home") {
-                HomeScreen(viewModel = viewModel, navController = navController)
+                HomeScreen(
+                    viewModel = viewModel,
+                    navController = navController,
+                    onNavigateToDownloads = {
+                        navController.navigate("downloads") { launchSingleTop = true }
+                    },
+                    onNavigateToSettings = {
+                        navController.navigate("settings") { launchSingleTop = true }
+                    }
+                )
             }
             composable("video_info") {
-                VideoInfoScreen(viewModel = viewModel, onBack = { navController.navigateUp() })
+                VideoInfoScreen(
+                    viewModel = viewModel,
+                    onBack = { navController.navigateUp() }
+                )
             }
             composable("downloads") {
                 DownloadsScreen(viewModel)
@@ -183,98 +216,8 @@ fun MainContent(viewModel: MainViewModel) {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeTopBar(
-    onNavigateToDownloads: () -> Unit,
-    onNavigateToSettings: () -> Unit,
-    viewModel: MainViewModel
-) {
-    TopAppBar(
-        title = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Surface(
-                    modifier = Modifier
-                        .size(32.dp)
-                        .clip(CircleShape),
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
-                ) {
-                    Icon(
-                        Icons.Default.VideoLibrary,
-                        "App Logo",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(6.dp)
-                    )
-                }
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    "Nosved",
-                    style = MaterialTheme.typography.headlineSmall.copy(
-                        fontWeight = FontWeight.Bold
-                    )
-                )
-            }
-        },
-        actions = {
-            TopBarActions(
-                onNavigateToDownloads = onNavigateToDownloads,
-                onNavigateToSettings = onNavigateToSettings,
-                viewModel = viewModel
-            )
-        }
-    )
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun SimpleTopBar(
-    title: String,
-    onNavigateUp: () -> Unit
-) {
-    TopAppBar(
-        title = { Text(title) },
-        navigationIcon = {
-            IconButton(onClick = onNavigateUp) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
-            }
-        }
-    )
-}
-
-@Composable
-fun TopBarActions(
-    onNavigateToDownloads: () -> Unit,
-    onNavigateToSettings: () -> Unit,
-    viewModel: MainViewModel
-) {
-    val allDownloads by viewModel.allDownloads.collectAsState(initial = emptyList())
-
-    val runningCount = remember(allDownloads) {
-        allDownloads.count {
-            it.status == com.devson.nosved.data.DownloadStatus.DOWNLOADING ||
-                    it.status == com.devson.nosved.data.DownloadStatus.QUEUED
-        }
-    }
-
-    if (runningCount > 0) {
-        BadgedBox(
-            badge = {
-                Badge { Text("$runningCount") }
-            }
-        ) {
-            IconButton(onClick = onNavigateToDownloads) {
-                Icon(Icons.Default.CloudDownload, "Downloads")
-            }
-        }
-    }
-
-    IconButton(onClick = onNavigateToSettings) {
-        Icon(Icons.Default.Settings, "Settings")
-    }
-}
-
-@Composable
-fun OptimizedBottomNavigation(
+fun ModernBottomNavigation(
     currentDestination: String?,
     onNavigate: (String) -> Unit,
     onQuickDownload: () -> Unit,
@@ -315,9 +258,17 @@ fun OptimizedBottomNavigation(
                     FloatingActionButton(
                         onClick = onQuickDownload,
                         modifier = Modifier.size(40.dp),
-                        containerColor = MaterialTheme.colorScheme.primary
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        elevation = FloatingActionButtonDefaults.elevation(
+                            defaultElevation = 2.dp,
+                            pressedElevation = 6.dp
+                        )
                     ) {
-                        Icon(Icons.Default.Download, "Quick Download")
+                        Icon(
+                            Icons.Default.Download,
+                            "Quick Download",
+                            modifier = Modifier.size(20.dp)
+                        )
                     }
                 }
             },
@@ -331,7 +282,16 @@ fun OptimizedBottomNavigation(
             icon = {
                 if (runningCount > 0) {
                     BadgedBox(
-                        badge = { Badge { Text("$runningCount") } }
+                        badge = {
+                            Badge(
+                                containerColor = MaterialTheme.colorScheme.error
+                            ) {
+                                Text(
+                                    "$runningCount",
+                                    style = MaterialTheme.typography.labelSmall
+                                )
+                            }
+                        }
                     ) {
                         Icon(Icons.AutoMirrored.Filled.List, "Downloads")
                     }
