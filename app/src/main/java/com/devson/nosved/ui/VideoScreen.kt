@@ -21,9 +21,6 @@ fun VideoScreen(
     var showSheet by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    // Somewhere in your UI header: a button “Formats”
-    // Button(onClick = { showSheet = true }) { Text("Formats") }
-
     if (showSheet && info != null) {
         ModalBottomSheet(
             onDismissRequest = { showSheet = false },

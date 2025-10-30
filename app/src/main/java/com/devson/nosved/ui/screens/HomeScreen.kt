@@ -35,7 +35,24 @@ fun HomeScreen(
                 onNavigateToSettings = onNavigateToSettings,
                 viewModel = viewModel
             )
-        }
+        },
+        floatingActionButton = {
+            // Updated Floating Paste Button (M3 standard)
+            FloatingActionButton(
+                onClick = { viewModel.pasteUrlOnly() },
+                containerColor = MaterialTheme.colorScheme.secondary, // M3 uses primary or secondary
+                contentColor = MaterialTheme.colorScheme.onSecondary,
+                elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 6.dp)
+                // Shape defaults to M3's RoundedCornerShape(16.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.ContentPaste,
+                    contentDescription = "Paste URL Only",
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+        },
+        floatingActionButtonPosition = FabPosition.End
     ) { paddingValues ->
         Box(
             modifier = modifier
@@ -52,7 +69,8 @@ fun HomeScreen(
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                        // Use standard M3 surface container color
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow
                     ),
                     elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
                     shape = RoundedCornerShape(16.dp)
@@ -85,8 +103,8 @@ fun HomeScreen(
                                     }
                                 }
                             },
-                            singleLine = true,
-                            shape = RoundedCornerShape(12.dp)
+                            singleLine = true
+                            // Removed shape - uses M3 default
                         )
 
                         // Action Buttons Row
@@ -97,19 +115,16 @@ fun HomeScreen(
                             // Search/Analyze Button
                             Button(
                                 onClick = { viewModel.fetchVideoInfo(currentUrl) },
-                                modifier = Modifier.weight(2f),
+                                modifier = Modifier
+                                    .weight(2f)
+                                    .height(48.dp), // Standard button height
                                 enabled = !isLoading && currentUrl.isNotBlank(),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (isLoading) MaterialTheme.colorScheme.surfaceVariant
-                                    else MaterialTheme.colorScheme.primary
-                                ),
-                                shape = RoundedCornerShape(12.dp)
+                                // Removed shape - uses M3 default (pill shape)
                             ) {
                                 if (isLoading) {
                                     CircularProgressIndicator(
                                         modifier = Modifier.size(18.dp),
                                         strokeWidth = 2.dp,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text("Analyzing...")
@@ -168,7 +183,8 @@ fun HomeScreen(
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f)
+                            // Use standard M3 surface container color
+                            containerColor = MaterialTheme.colorScheme.surfaceContainer
                         ),
                         shape = RoundedCornerShape(16.dp)
                     ) {
@@ -180,7 +196,7 @@ fun HomeScreen(
                                 text = "🚀 Features",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                                color = MaterialTheme.colorScheme.onSurface // Adjusted for surfaceContainer
                             )
 
                             FeatureItem(
@@ -207,26 +223,7 @@ fun HomeScreen(
                 Spacer(modifier = Modifier.weight(1f))
             }
 
-            // Updated Floating Paste Button
-            FloatingActionButton(
-                onClick = { viewModel.pasteUrlOnly() },
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(end = 16.dp, bottom = 24.dp),
-                containerColor = MaterialTheme.colorScheme.secondary,
-                contentColor = MaterialTheme.colorScheme.onSecondary,
-                elevation = FloatingActionButtonDefaults.elevation(
-                    defaultElevation = 8.dp,
-                    pressedElevation = 12.dp
-                ),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.ContentPaste,
-                    contentDescription = "Paste URL Only",
-                    modifier = Modifier.size(24.dp)
-                )
-            }
+            // FAB is now part of the Scaffold, so removed from here
         }
     }
 }
@@ -245,12 +242,12 @@ fun HomeTopAppBar(
                     modifier = Modifier
                         .size(32.dp)
                         .clip(CircleShape),
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                    color = MaterialTheme.colorScheme.primaryContainer
                 ) {
                     Icon(
                         Icons.Default.VideoLibrary,
                         "App Logo",
-                        tint = MaterialTheme.colorScheme.primary,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
                         modifier = Modifier.padding(6.dp)
                     )
                 }
@@ -343,12 +340,12 @@ private fun FeatureItem(
                 text = title,
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSecondaryContainer
+                color = MaterialTheme.colorScheme.onSurface // Adjusted for surfaceContainer
             )
             Text(
                 text = description,
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
+                color = MaterialTheme.colorScheme.onSurfaceVariant // Use onSurfaceVariant
             )
         }
     }
