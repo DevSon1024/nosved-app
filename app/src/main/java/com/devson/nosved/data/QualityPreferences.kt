@@ -3,7 +3,9 @@ package com.devson.nosved.data
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
@@ -14,13 +16,33 @@ val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "qu
 class QualityPreferences(private val context: Context) {
 
     companion object {
+        // Basic Quality Settings
         val VIDEO_QUALITY_KEY = stringPreferencesKey("video_quality")
         val AUDIO_QUALITY_KEY = stringPreferencesKey("audio_quality")
         val DOWNLOAD_MODE_KEY = stringPreferencesKey("download_mode")
         val VIDEO_CONTAINER_KEY = stringPreferencesKey("video_container")
         val AUDIO_CONTAINER_KEY = stringPreferencesKey("audio_container")
+
+        // Audio Enhancements
+        val EMBED_METADATA_KEY = booleanPreferencesKey("embed_metadata")
+        val CONVERT_TO_MP3_KEY = booleanPreferencesKey("convert_to_mp3")
+
+        // Subtitle Settings
+        val DOWNLOAD_SUBTITLES_KEY = booleanPreferencesKey("download_subtitles")
+        val SUBTITLE_FORMAT_KEY = stringPreferencesKey("subtitle_format")
+        val CONVERT_SUBTITLES_KEY = booleanPreferencesKey("convert_subtitles")
+        val DOWNLOAD_AUTO_CAPTIONS_KEY = booleanPreferencesKey("download_auto_captions")
+
+        // Advanced Features
+        val ENABLE_SPONSORS_BLOCK_KEY = booleanPreferencesKey("enable_sponsors_block")
+        val EXTRACT_AUDIO_KEY = booleanPreferencesKey("extract_audio")
+        val KEEP_VIDEO_AFTER_AUDIO_EXTRACTION_KEY = booleanPreferencesKey("keep_video_after_audio_extraction")
+        val ENABLE_COOKIES_KEY = booleanPreferencesKey("enable_cookies")
+        val MAX_DOWNLOAD_RETRIES_KEY = intPreferencesKey("max_download_retries")
+        val PREFERRED_LANGUAGE_KEY = stringPreferencesKey("preferred_language")
     }
 
+    // Basic Quality Flows
     val videoQuality: Flow<String> = context.dataStore.data
         .map { preferences -> preferences[VIDEO_QUALITY_KEY] ?: "720p" }
 
@@ -42,6 +64,46 @@ class QualityPreferences(private val context: Context) {
     val audioContainer: Flow<String> = context.dataStore.data
         .map { preferences -> preferences[AUDIO_CONTAINER_KEY] ?: "M4A" }
 
+    // Audio Enhancement Flows
+    val embedMetadata: Flow<Boolean> = context.dataStore.data
+        .map { preferences -> preferences[EMBED_METADATA_KEY] ?: true }
+
+    val convertToMp3: Flow<Boolean> = context.dataStore.data
+        .map { preferences -> preferences[CONVERT_TO_MP3_KEY] ?: false }
+
+    // Subtitle Flows
+    val downloadSubtitles: Flow<Boolean> = context.dataStore.data
+        .map { preferences -> preferences[DOWNLOAD_SUBTITLES_KEY] ?: false }
+
+    val subtitleFormat: Flow<String> = context.dataStore.data
+        .map { preferences -> preferences[SUBTITLE_FORMAT_KEY] ?: "srt" }
+
+    val convertSubtitles: Flow<Boolean> = context.dataStore.data
+        .map { preferences -> preferences[CONVERT_SUBTITLES_KEY] ?: false }
+
+    val downloadAutoCaptions: Flow<Boolean> = context.dataStore.data
+        .map { preferences -> preferences[DOWNLOAD_AUTO_CAPTIONS_KEY] ?: false }
+
+    // Advanced Feature Flows
+    val enableSponsorsBlock: Flow<Boolean> = context.dataStore.data
+        .map { preferences -> preferences[ENABLE_SPONSORS_BLOCK_KEY] ?: false }
+
+    val extractAudio: Flow<Boolean> = context.dataStore.data
+        .map { preferences -> preferences[EXTRACT_AUDIO_KEY] ?: false }
+
+    val keepVideoAfterAudioExtraction: Flow<Boolean> = context.dataStore.data
+        .map { preferences -> preferences[KEEP_VIDEO_AFTER_AUDIO_EXTRACTION_KEY] ?: false }
+
+    val enableCookies: Flow<Boolean> = context.dataStore.data
+        .map { preferences -> preferences[ENABLE_COOKIES_KEY] ?: false }
+
+    val maxDownloadRetries: Flow<Int> = context.dataStore.data
+        .map { preferences -> preferences[MAX_DOWNLOAD_RETRIES_KEY] ?: 3 }
+
+    val preferredLanguage: Flow<String> = context.dataStore.data
+        .map { preferences -> preferences[PREFERRED_LANGUAGE_KEY] ?: "en" }
+
+    // Basic Setters
     suspend fun setVideoQuality(quality: String) {
         context.dataStore.edit { preferences ->
             preferences[VIDEO_QUALITY_KEY] = quality
@@ -71,6 +133,81 @@ class QualityPreferences(private val context: Context) {
             preferences[AUDIO_CONTAINER_KEY] = container
         }
     }
+
+    // Audio Enhancement Setters
+    suspend fun setEmbedMetadata(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[EMBED_METADATA_KEY] = enabled
+        }
+    }
+
+    suspend fun setConvertToMp3(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[CONVERT_TO_MP3_KEY] = enabled
+        }
+    }
+
+    // Subtitle Setters
+    suspend fun setDownloadSubtitles(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[DOWNLOAD_SUBTITLES_KEY] = enabled
+        }
+    }
+
+    suspend fun setSubtitleFormat(format: String) {
+        context.dataStore.edit { preferences ->
+            preferences[SUBTITLE_FORMAT_KEY] = format
+        }
+    }
+
+    suspend fun setConvertSubtitles(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[CONVERT_SUBTITLES_KEY] = enabled
+        }
+    }
+
+    suspend fun setDownloadAutoCaptions(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[DOWNLOAD_AUTO_CAPTIONS_KEY] = enabled
+        }
+    }
+
+    // Advanced Feature Setters
+    suspend fun setEnableSponsorsBlock(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[ENABLE_SPONSORS_BLOCK_KEY] = enabled
+        }
+    }
+
+    suspend fun setExtractAudio(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[EXTRACT_AUDIO_KEY] = enabled
+        }
+    }
+
+    suspend fun setKeepVideoAfterAudioExtraction(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[KEEP_VIDEO_AFTER_AUDIO_EXTRACTION_KEY] = enabled
+        }
+    }
+
+    suspend fun setEnableCookies(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[ENABLE_COOKIES_KEY] = enabled
+        }
+    }
+
+    suspend fun setMaxDownloadRetries(retries: Int) {
+        context.dataStore.edit { preferences ->
+            preferences[MAX_DOWNLOAD_RETRIES_KEY] = retries
+        }
+    }
+
+    suspend fun setPreferredLanguage(language: String) {
+        context.dataStore.edit { preferences ->
+            preferences[PREFERRED_LANGUAGE_KEY] = language
+        }
+    }
 }
 
 enum class DownloadMode {
@@ -85,33 +222,70 @@ data class QualityOption(
 )
 
 object QualityConstants {
-    val VIDEO_MP4_QUALITIES = listOf(
-        QualityOption("480p", "480p"),
-        QualityOption("720p (HD)", "720p", true),
-        QualityOption("1080p (FHD)", "1080p"),
+    // Enhanced Video Qualities with Best/Lowest options
+    val ENHANCED_VIDEO_MP4_QUALITIES = listOf(
+        QualityOption("Best Quality", "best"),
+        QualityOption("2160p (4K)", "2160p"),
         QualityOption("1440p (2K)", "1440p"),
-        QualityOption("2160p (4K)", "2160p")
+        QualityOption("1080p (FHD)", "1080p"),
+        QualityOption("720p (HD)", "720p", true),
+        QualityOption("480p", "480p"),
+        QualityOption("360p", "360p"),
+        QualityOption("240p", "240p"),
+        QualityOption("144p", "144p"),
+        QualityOption("Lowest Quality", "worst")
     )
 
-    val VIDEO_WEBM_QUALITIES = listOf(
-        QualityOption("480p", "480p"),
-        QualityOption("720p (HD)", "720p", true),
-        QualityOption("1080p (FHD)", "1080p"),
+    val ENHANCED_VIDEO_WEBM_QUALITIES = listOf(
+        QualityOption("Best Quality", "best"),
+        QualityOption("2160p (4K)", "2160p"),
         QualityOption("1440p (2K)", "1440p"),
-        QualityOption("2160p (4K)", "2160p")
+        QualityOption("1080p (FHD)", "1080p"),
+        QualityOption("720p (HD)", "720p", true),
+        QualityOption("480p", "480p"),
+        QualityOption("360p", "360p"),
+        QualityOption("240p", "240p"),
+        QualityOption("144p", "144p"),
+        QualityOption("Lowest Quality", "worst")
     )
 
-    val AUDIO_M4A_QUALITIES = listOf(
-        QualityOption("64kbps", "64kbps"),
-        QualityOption("128kbps", "128kbps", true),
+    // Enhanced Audio Qualities with unlimited option
+    val ENHANCED_AUDIO_M4A_QUALITIES = listOf(
+        QualityOption("Unlimited Quality", "unlimited"),
+        QualityOption("320kbps", "320kbps"),
+        QualityOption("256kbps", "256kbps"),
         QualityOption("192kbps", "192kbps"),
-        QualityOption("256kbps", "256kbps")
+        QualityOption("128kbps", "128kbps", true),
+        QualityOption("96kbps", "96kbps"),
+        QualityOption("64kbps", "64kbps"),
+        QualityOption("48kbps", "48kbps")
     )
 
-    val AUDIO_WEBM_OPUS_QUALITIES = listOf(
-        QualityOption("64kbps", "64kbps"),
-        QualityOption("128kbps", "128kbps", true),
+    val ENHANCED_AUDIO_WEBM_OPUS_QUALITIES = listOf(
+        QualityOption("Unlimited Quality", "unlimited"),
+        QualityOption("256kbps", "256kbps"),
+        QualityOption("192kbps", "192kbps"),
         QualityOption("160kbps", "160kbps"),
-        QualityOption("192kbps", "192kbps")
+        QualityOption("128kbps", "128kbps", true),
+        QualityOption("96kbps", "96kbps"),
+        QualityOption("64kbps", "64kbps"),
+        QualityOption("48kbps", "48kbps")
     )
+
+    // Legacy qualities for backwards compatibility
+    val VIDEO_MP4_QUALITIES = ENHANCED_VIDEO_MP4_QUALITIES.filter {
+        !listOf("best", "worst").contains(it.value)
+    }.take(5)
+
+    val VIDEO_WEBM_QUALITIES = ENHANCED_VIDEO_WEBM_QUALITIES.filter {
+        !listOf("best", "worst").contains(it.value)
+    }.take(5)
+
+    val AUDIO_M4A_QUALITIES = ENHANCED_AUDIO_M4A_QUALITIES.filter {
+        it.value != "unlimited"
+    }.take(4)
+
+    val AUDIO_WEBM_OPUS_QUALITIES = ENHANCED_AUDIO_WEBM_OPUS_QUALITIES.filter {
+        it.value != "unlimited"
+    }.take(4)
 }

@@ -38,16 +38,19 @@ fun QualitySettingsScreen(
     val currentVideoContainer by qualityPrefs.videoContainer.collectAsState(initial = "MP4")
     val currentAudioContainer by qualityPrefs.audioContainer.collectAsState(initial = "M4A")
 
+    // New preferences
+    val embedMetadata by qualityPrefs.embedMetadata.collectAsState(initial = true)
+    val convertToMp3 by qualityPrefs.convertToMp3.collectAsState(initial = false)
+
     var showAllVideoQualities by remember { mutableStateOf(false) }
     var showAllAudioQualities by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Download Quality Settings") },
+                title = { Text("Format Settings") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        // Fix: Use AutoMirrored.Filled.ArrowBack
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
                     }
                 }
@@ -90,126 +93,192 @@ fun QualitySettingsScreen(
                 }
             }
 
-            // Video Quality (only show if video mode is selected)
+            // Audio Only Section
+            item {
+                AnimatedVisibility(
+                    visible = currentMode == DownloadMode.AUDIO_ONLY,
+                    enter = fadeIn() + expandVertically(),
+                    exit = fadeOut() + shrinkVertically()
+                ) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                        )
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            Text(
+                                text = "🎵 Audio Only Settings",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+
+                            // Audio Quality Selection
+                            Column {
+                                Text("Audio Quality", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(bottom = 8.dp))
+
+                                val audioQualities = if (currentAudioContainer == "M4A")
+                                    QualityConstants.ENHANCED_AUDIO_M4A_QUALITIES
+                                else
+                                    QualityConstants.ENHANCED_AUDIO_WEBM_OPUS_QUALITIES
+
+                                val qualitiesToShow = if (showAllAudioQualities) audioQualities else audioQualities.take(4)
+
+                                qualitiesToShow.forEach { quality ->
+                                    QualitySelectorRow(
+                                        text = quality.label,
+                                        selected = currentAudioQuality == quality.value,
+                                        onClick = {
+                                            scope.launch { qualityPrefs.setAudioQuality(quality.value) }
+                                        }
+                                    )
+                                }
+
+                                if (audioQualities.size > 4) {
+                                    TextButton(
+                                        onClick = { showAllAudioQualities = !showAllAudioQualities }
+                                    ) {
+                                        Text(if (showAllAudioQualities) "Show Less" else "Show All Qualities")
+                                        Icon(Icons.Default.ExpandMore, contentDescription = null,
+                                            modifier = Modifier.graphicsLayer(rotationZ = if(showAllAudioQualities) 180f else 0f))
+                                    }
+                                }
+                            }
+
+                            Divider()
+
+                            // Embed Metadata Toggle
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Embed Metadata",
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                    Text(
+                                        text = "Add video info to audio file",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Switch(
+                                    checked = embedMetadata,
+                                    onCheckedChange = { scope.launch { qualityPrefs.setEmbedMetadata(it) } }
+                                )
+                            }
+
+                            // Convert to MP3 Toggle
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Convert to MP3",
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                    Text(
+                                        text = "Convert M4A/WEBM to MP3 format",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Switch(
+                                    checked = convertToMp3,
+                                    onCheckedChange = { scope.launch { qualityPrefs.setConvertToMp3(it) } }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Video + Audio Section
             item {
                 AnimatedVisibility(
                     visible = currentMode == DownloadMode.VIDEO_AUDIO,
                     enter = fadeIn() + expandVertically(),
                     exit = fadeOut() + shrinkVertically()
                 ) {
-                    Column {
-                        Text(
-                            text = "Default Video Quality",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.padding(bottom = 12.dp)
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f)
                         )
-
-                        // Container Selection
-                        Text("Format / Container", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 8.dp))
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.padding(bottom = 8.dp).fillMaxWidth()
-                        ) {
-                            FilterChip(
-                                selected = currentVideoContainer == "MP4",
-                                onClick = { scope.launch { qualityPrefs.setVideoContainer("MP4") } },
-                                label = { Text("MP4") },
-                                modifier = Modifier.weight(1f)
-                            )
-                            FilterChip(
-                                selected = currentVideoContainer == "WEBM",
-                                onClick = { scope.launch { qualityPrefs.setVideoContainer("WEBM") } },
-                                label = { Text("WEBM") },
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-
-                        // Quality Selection
-                        Text("Quality", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 8.dp))
-                        val videoQualities = if (currentVideoContainer == "MP4")
-                            QualityConstants.VIDEO_MP4_QUALITIES
-                        else
-                            QualityConstants.VIDEO_WEBM_QUALITIES
-
-                        val qualitiesToShow = if (showAllVideoQualities) videoQualities else videoQualities.take(3)
-
-                        qualitiesToShow.forEach { quality ->
-                            QualitySelectorRow(
-                                text = quality.label,
-                                selected = currentVideoQuality == quality.value,
-                                onClick = {
-                                    scope.launch { qualityPrefs.setVideoQuality(quality.value) }
-                                }
-                            )
-                        }
-
-                        TextButton(
-                            onClick = { showAllVideoQualities = !showAllVideoQualities },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(if (showAllVideoQualities) "Show Less" else "Show All Qualities")
-                            Icon(Icons.Default.ExpandMore, contentDescription = null, modifier = Modifier.graphicsLayer(rotationZ = if(showAllVideoQualities) 180f else 0f))
-                        }
-                    }
-                }
-            }
-
-            // Audio Quality
-            item {
-                Column {
-                    Text(
-                        text = "Default Audio Quality",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.padding(bottom = 12.dp)
-                    )
-
-                    // Container Selection
-                    Text("Format / Container", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 8.dp))
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.padding(bottom = 8.dp).fillMaxWidth()
                     ) {
-                        FilterChip(
-                            selected = currentAudioContainer == "M4A",
-                            onClick = { scope.launch { qualityPrefs.setAudioContainer("M4A") } },
-                            label = { Text("M4A") },
-                            modifier = Modifier.weight(1f)
-                        )
-                        FilterChip(
-                            selected = currentAudioContainer == "WEBM OPUS",
-                            onClick = { scope.launch { qualityPrefs.setAudioContainer("WEBM OPUS") } },
-                            label = { Text("WEBM OPUS") },
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            Text(
+                                text = "🎬 Video + Audio Settings",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
 
-                    // Quality Selection
-                    Text("Quality", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 8.dp))
-                    val audioQualities = if (currentAudioContainer == "M4A")
-                        QualityConstants.AUDIO_M4A_QUALITIES
-                    else
-                        QualityConstants.AUDIO_WEBM_OPUS_QUALITIES
-
-                    val qualitiesToShow = if (showAllAudioQualities) audioQualities else audioQualities.take(3)
-
-                    qualitiesToShow.forEach { quality ->
-                        QualitySelectorRow(
-                            text = quality.label,
-                            selected = currentAudioQuality == quality.value,
-                            onClick = {
-                                scope.launch { qualityPrefs.setAudioQuality(quality.value) }
+                            // Video Format Mode Selection
+                            Text("Video Format Mode", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(bottom = 8.dp))
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                FilterChip(
+                                    selected = currentVideoContainer == "MP4",
+                                    onClick = { scope.launch { qualityPrefs.setVideoContainer("MP4") } },
+                                    label = { Text("MP4") },
+                                    modifier = Modifier.weight(1f)
+                                )
+                                FilterChip(
+                                    selected = currentVideoContainer == "WEBM",
+                                    onClick = { scope.launch { qualityPrefs.setVideoContainer("WEBM") } },
+                                    label = { Text("WEBM") },
+                                    modifier = Modifier.weight(1f)
+                                )
                             }
-                        )
-                    }
 
-                    TextButton(
-                        onClick = { showAllAudioQualities = !showAllAudioQualities },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(if (showAllAudioQualities) "Show Less" else "Show All Qualities")
-                        Icon(Icons.Default.ExpandMore, contentDescription = null, modifier = Modifier.graphicsLayer(rotationZ = if(showAllAudioQualities) 180f else 0f))
+                            // Video Quality Selection
+                            Column {
+                                Text("Video Quality", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(bottom = 8.dp))
+
+                                val videoQualities = if (currentVideoContainer == "MP4")
+                                    QualityConstants.ENHANCED_VIDEO_MP4_QUALITIES
+                                else
+                                    QualityConstants.ENHANCED_VIDEO_WEBM_QUALITIES
+
+                                val qualitiesToShow = if (showAllVideoQualities) videoQualities else videoQualities.take(4)
+
+                                qualitiesToShow.forEach { quality ->
+                                    QualitySelectorRow(
+                                        text = quality.label,
+                                        selected = currentVideoQuality == quality.value,
+                                        onClick = {
+                                            scope.launch { qualityPrefs.setVideoQuality(quality.value) }
+                                        }
+                                    )
+                                }
+
+                                if (videoQualities.size > 4) {
+                                    TextButton(
+                                        onClick = { showAllVideoQualities = !showAllVideoQualities }
+                                    ) {
+                                        Text(if (showAllVideoQualities) "Show Less" else "Show All Qualities")
+                                        Icon(Icons.Default.ExpandMore, contentDescription = null,
+                                            modifier = Modifier.graphicsLayer(rotationZ = if(showAllVideoQualities) 180f else 0f))
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }

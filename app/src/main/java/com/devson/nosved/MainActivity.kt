@@ -22,18 +22,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.*
 import com.devson.nosved.ui.theme.NosvedTheme
-import com.devson.nosved.ui.screens.HomeScreen
-import com.devson.nosved.ui.screens.VideoInfoScreen
-import com.devson.nosved.ui.screens.DownloadsScreen
-import com.devson.nosved.ui.screens.QualitySettingsScreen
-import com.devson.nosved.ui.screens.SettingsScreen
+import com.devson.nosved.ui.screens.*
 import com.yausername.ffmpeg.FFmpeg
 import com.yausername.youtubedl_android.YoutubeDL
 import com.yausername.youtubedl_android.YoutubeDLException
@@ -50,7 +45,6 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Lightweight initialization
         initializeDownloader()
         askNotificationPermission()
 
@@ -92,11 +86,9 @@ fun MainContent(viewModel: MainViewModel) {
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = currentBackStackEntry?.destination?.route
 
-    // Optimized state collection - only collect when needed
     val videoInfo by viewModel.videoInfo.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
 
-    // Reduced recomposition scope for navigation
     LaunchedEffect(videoInfo, isLoading) {
         if (videoInfo != null && !isLoading) {
             navController.navigate("video_info") {
@@ -107,17 +99,28 @@ fun MainContent(viewModel: MainViewModel) {
 
     Scaffold(
         topBar = {
-            OptimizedTopBar(
-                currentDestination = currentDestination,
-                onNavigateUp = { navController.navigateUp() },
-                onNavigateToDownloads = {
-                    navController.navigate("downloads") { launchSingleTop = true }
-                },
-                onNavigateToSettings = {
-                    navController.navigate("settings") { launchSingleTop = true }
-                },
-                viewModel = viewModel
-            )
+            // Only show top bar on Home page
+            if (currentDestination == "home") {
+                OptimizedTopBar(
+                    onNavigateToDownloads = {
+                        navController.navigate("downloads") { launchSingleTop = true }
+                    },
+                    onNavigateToSettings = {
+                        navController.navigate("settings") { launchSingleTop = true }
+                    },
+                    viewModel = viewModel
+                )
+            } else if (currentDestination == "video_info") {
+                // Simple back navigation for video info
+                TopAppBar(
+                    title = { Text("Video Details") },
+                    navigationIcon = {
+                        IconButton(onClick = { navController.navigateUp() }) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                        }
+                    }
+                )
+            }
         },
         bottomBar = {
             if (currentDestination != "video_info") {
@@ -141,7 +144,6 @@ fun MainContent(viewModel: MainViewModel) {
             navController = navController,
             startDestination = "home",
             modifier = Modifier.padding(innerPadding),
-            // Simplified animations for better performance
             enterTransition = {
                 slideIntoContainer(
                     towards = AnimatedContentTransitionScope.SlideDirection.Left,
@@ -179,11 +181,15 @@ fun MainContent(viewModel: MainViewModel) {
             composable("settings") {
                 SettingsScreen(
                     onNavigateBack = { navController.navigateUp() },
-                    onNavigateToQualitySettings = { navController.navigate("quality_settings") }
+                    onNavigateToQualitySettings = { navController.navigate("quality_settings") },
+                    onNavigateToAdvancedSettings = { navController.navigate("advanced_settings") }
                 )
             }
             composable("quality_settings") {
                 QualitySettingsScreen(onNavigateBack = { navController.navigateUp() })
+            }
+            composable("advanced_settings") {
+                AdvancedSettingsScreen(onNavigateBack = { navController.navigateUp() })
             }
         }
     }
@@ -192,57 +198,43 @@ fun MainContent(viewModel: MainViewModel) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OptimizedTopBar(
-    currentDestination: String?,
-    onNavigateUp: () -> Unit,
     onNavigateToDownloads: () -> Unit,
     onNavigateToSettings: () -> Unit,
     viewModel: MainViewModel
 ) {
-    if (currentDestination == "video_info") {
-        TopAppBar(
-            title = { Text("Video Details") },
-            navigationIcon = {
-                IconButton(onClick = onNavigateUp) {
-                    // Fix: Use AutoMirrored.Filled.ArrowBack
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
-                }
-            }
-        )
-    } else {
-        TopAppBar(
-            title = {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Surface(
-                        modifier = Modifier
-                            .size(32.dp)
-                            .clip(CircleShape),
-                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
-                    ) {
-                        Icon(
-                            Icons.Default.VideoLibrary,
-                            "App Logo",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(6.dp)
-                        )
-                    }
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        "Nosved",
-                        style = MaterialTheme.typography.headlineSmall.copy(
-                            fontWeight = FontWeight.Bold
-                        )
+    TopAppBar(
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Surface(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape),
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                ) {
+                    Icon(
+                        Icons.Default.VideoLibrary,
+                        "App Logo",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(6.dp)
                     )
                 }
-            },
-            actions = {
-                TopBarActions(
-                    onNavigateToDownloads = onNavigateToDownloads,
-                    onNavigateToSettings = onNavigateToSettings,
-                    viewModel = viewModel
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    "Nosved",
+                    style = MaterialTheme.typography.headlineSmall.copy(
+                        fontWeight = FontWeight.Bold
+                    )
                 )
             }
-        )
-    }
+        },
+        actions = {
+            TopBarActions(
+                onNavigateToDownloads = onNavigateToDownloads,
+                onNavigateToSettings = onNavigateToSettings,
+                viewModel = viewModel
+            )
+        }
+    )
 }
 
 @Composable
@@ -253,7 +245,6 @@ fun TopBarActions(
 ) {
     val allDownloads by viewModel.allDownloads.collectAsState(initial = emptyList())
 
-    // Optimize badge calculation with remember
     val runningCount = remember(allDownloads) {
         allDownloads.count {
             it.status == com.devson.nosved.data.DownloadStatus.DOWNLOADING ||
@@ -287,7 +278,6 @@ fun OptimizedBottomNavigation(
 ) {
     val allDownloads by viewModel.allDownloads.collectAsState(initial = emptyList())
 
-    // Optimize badge calculation with remember to prevent recomposition
     val runningCount = remember(allDownloads) {
         allDownloads.count {
             it.status == com.devson.nosved.data.DownloadStatus.DOWNLOADING ||
@@ -339,11 +329,9 @@ fun OptimizedBottomNavigation(
                     BadgedBox(
                         badge = { Badge { Text("$runningCount") } }
                     ) {
-                        // Fix: Use AutoMirrored.Filled.List
                         Icon(Icons.AutoMirrored.Filled.List, "Downloads")
                     }
                 } else {
-                    // Fix: Use AutoMirrored.Filled.List
                     Icon(Icons.AutoMirrored.Filled.List, "Downloads")
                 }
             },

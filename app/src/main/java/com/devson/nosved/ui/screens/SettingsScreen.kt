@@ -6,7 +6,6 @@ import android.net.Uri
 import android.os.Environment
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
@@ -21,12 +20,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.devson.nosved.data.*
 import kotlinx.coroutines.Dispatchers
+import androidx.compose.ui.graphics.vector.ImageVector
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.text.DecimalFormat
 
-// Fix: Properly define sealed class
 sealed class DialogState {
     object None : DialogState()
     object DownloadLocation : DialogState()
@@ -36,23 +35,21 @@ sealed class DialogState {
 @Composable
 fun SettingsScreen(
     onNavigateBack: () -> Unit,
-    onNavigateToQualitySettings: () -> Unit
+    onNavigateToQualitySettings: () -> Unit,
+    onNavigateToAdvancedSettings: () -> Unit
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    // Fix: Initialize with proper DialogState.None
     var dialogState by remember { mutableStateOf<DialogState>(DialogState.None) }
     var storageInfo by remember { mutableStateOf("Calculating..." to "...") }
 
-    // Load storage info asynchronously to prevent blocking
     LaunchedEffect(Unit) {
         storageInfo = withContext(Dispatchers.IO) {
             getStorageInfoOptimized(context)
         }
     }
 
-    // Optimize download folder - don't recalculate on every recomposition
     val downloadFolder = remember { getCurrentDownloadFolder(context) }
 
     val folderPickerLauncher = rememberLauncherForActivityResult(
@@ -69,40 +66,119 @@ fun SettingsScreen(
                 title = { Text("Settings") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        // Fix: Use AutoMirrored.Filled.ArrowBack
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
                     }
                 }
             )
         }
     ) { paddingValues ->
-        OptimizedSettingsList(
-            modifier = Modifier.padding(paddingValues),
-            downloadFolder = downloadFolder,
-            storageInfo = storageInfo,
-            onNavigateToQualitySettings = onNavigateToQualitySettings,
-            onDownloadLocationClick = { dialogState = DialogState.DownloadLocation },
-            onClearCacheClick = {
-                scope.launch {
-                    withContext(Dispatchers.IO) {
-                        clearAppCache(context)
-                    }
-                    storageInfo = withContext(Dispatchers.IO) {
-                        getStorageInfoOptimized(context)
-                    }
-                    showToast(context, "Cache cleared!")
+        LazyColumn(
+            modifier = Modifier
+                .padding(paddingValues)
+                .fillMaxSize(),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            // Download Settings Section
+            settingsSection("Download Settings") {
+                item {
+                    SettingsItem(
+                        icon = Icons.Default.Folder,
+                        title = "Download Location",
+                        subtitle = downloadFolder.substringAfterLast("/"),
+                        onClick = { dialogState = DialogState.DownloadLocation }
+                    )
                 }
-            },
-            onShareClick = { shareApp(context) },
-            onGitHubClick = { openGitHub(context) },
-            onIssueClick = { openIssueTracker(context) }
-        )
+                item {
+                    SettingsItem(
+                        icon = Icons.Default.Tune,
+                        title = "Format Settings",
+                        subtitle = "Set default mode, formats, and quality",
+                        onClick = onNavigateToQualitySettings
+                    )
+                }
+                item {
+                    SettingsItem(
+                        icon = Icons.Default.Settings,
+                        title = "Advanced Settings",
+                        subtitle = "Subtitles, SponsorBlock, and more",
+                        onClick = onNavigateToAdvancedSettings
+                    )
+                }
+            }
+
+            // Storage Section
+            settingsSection("Storage") {
+                item {
+                    SettingsItem(
+                        icon = Icons.Default.Storage,
+                        title = "Storage Usage",
+                        subtitle = "Used: ${storageInfo.first} • Available: ${storageInfo.second}",
+                        onClick = { }
+                    )
+                }
+                item {
+                    SettingsItem(
+                        icon = Icons.Default.CleaningServices,
+                        title = "Clear Cache",
+                        subtitle = "Remove temporary files",
+                        onClick = {
+                            scope.launch {
+                                withContext(Dispatchers.IO) {
+                                    clearAppCache(context)
+                                }
+                                storageInfo = withContext(Dispatchers.IO) {
+                                    getStorageInfoOptimized(context)
+                                }
+                                showToast(context, "Cache cleared!")
+                            }
+                        }
+                    )
+                }
+            }
+
+            // About Section
+            settingsSection("About") {
+                item {
+                    SettingsItem(
+                        icon = Icons.Default.Info,
+                        title = "App Version",
+                        subtitle = "1.2.0",
+                        onClick = { }
+                    )
+                }
+                item {
+                    SettingsItem(
+                        icon = Icons.Default.Code,
+                        title = "Source Code",
+                        subtitle = "View on GitHub",
+                        onClick = { openGitHub(context) }
+                    )
+                }
+                item {
+                    SettingsItem(
+                        icon = Icons.Default.BugReport,
+                        title = "Report Issue",
+                        subtitle = "Found a bug? Let us know",
+                        onClick = { openIssueTracker(context) }
+                    )
+                }
+                item {
+                    SettingsItem(
+                        icon = Icons.Default.Share,
+                        title = "Share App",
+                        subtitle = "Tell your friends about Nosved",
+                        onClick = { shareApp(context) }
+                    )
+                }
+            }
+        }
     }
 
-    // Fix: Handle dialogs efficiently with proper when expression
+    // Handle dialogs
     when (val currentDialogState = dialogState) {
         is DialogState.DownloadLocation -> {
-            OptimizedDownloadFolderDialog(
+            DownloadFolderDialog(
                 downloadFolder = downloadFolder,
                 onDismiss = { dialogState = DialogState.None },
                 onChooseFolder = {
@@ -125,102 +201,6 @@ fun SettingsScreen(
     }
 }
 
-@Composable
-fun OptimizedSettingsList(
-    modifier: Modifier = Modifier,
-    downloadFolder: String,
-    storageInfo: Pair<String, String>,
-    onNavigateToQualitySettings: () -> Unit,
-    onDownloadLocationClick: () -> Unit,
-    onClearCacheClick: () -> Unit,
-    onShareClick: () -> Unit,
-    onGitHubClick: () -> Unit,
-    onIssueClick: () -> Unit
-) {
-    LazyColumn(
-        modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        // Download Settings Section
-        settingsSection("Download Settings") {
-            item {
-                OptimizedSettingsItem(
-                    icon = Icons.Default.Folder,
-                    title = "Download Location",
-                    subtitle = downloadFolder.substringAfterLast("/"),
-                    onClick = onDownloadLocationClick
-                )
-            }
-            item {
-                OptimizedSettingsItem(
-                    icon = Icons.Default.Tune,
-                    title = "Download Quality Settings",
-                    subtitle = "Set default mode, formats, and quality",
-                    onClick = onNavigateToQualitySettings
-                )
-            }
-        }
-
-        // Storage Section
-        settingsSection("Storage") {
-            item {
-                OptimizedSettingsItem(
-                    icon = Icons.Default.Storage,
-                    title = "Storage Usage",
-                    subtitle = "Used: ${storageInfo.first} • Available: ${storageInfo.second}",
-                    onClick = { }
-                )
-            }
-            item {
-                OptimizedSettingsItem(
-                    icon = Icons.Default.CleaningServices,
-                    title = "Clear Cache",
-                    subtitle = "Remove temporary files",
-                    onClick = onClearCacheClick
-                )
-            }
-        }
-
-        // About Section
-        settingsSection("About") {
-            item {
-                OptimizedSettingsItem(
-                    icon = Icons.Default.Info,
-                    title = "App Version",
-                    subtitle = "1.1.0",
-                    onClick = { }
-                )
-            }
-            item {
-                OptimizedSettingsItem(
-                    icon = Icons.Default.Code,
-                    title = "Source Code",
-                    subtitle = "View on GitHub",
-                    onClick = onGitHubClick
-                )
-            }
-            item {
-                OptimizedSettingsItem(
-                    icon = Icons.Default.BugReport,
-                    title = "Report Issue",
-                    subtitle = "Found a bug? Let us know",
-                    onClick = onIssueClick
-                )
-            }
-            item {
-                OptimizedSettingsItem(
-                    icon = Icons.Default.Share,
-                    title = "Share App",
-                    subtitle = "Tell your friends about Nosved",
-                    onClick = onShareClick
-                )
-            }
-        }
-    }
-}
-
-// Optimized section builder
 fun LazyListScope.settingsSection(
     title: String,
     content: LazyListScope.() -> Unit
@@ -240,8 +220,8 @@ fun LazyListScope.settingsSection(
 }
 
 @Composable
-fun OptimizedSettingsItem(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+fun SettingsItem(
+    icon: ImageVector,
     title: String,
     subtitle: String,
     onClick: () -> Unit
@@ -284,9 +264,8 @@ fun OptimizedSettingsItem(
     }
 }
 
-// Optimized dialogs
 @Composable
-fun OptimizedDownloadFolderDialog(
+fun DownloadFolderDialog(
     downloadFolder: String,
     onDismiss: () -> Unit,
     onChooseFolder: () -> Unit,
@@ -337,7 +316,7 @@ fun OptimizedDownloadFolderDialog(
     )
 }
 
-// Optimized helper functions
+// Helper functions (unchanged)
 fun showToast(context: Context, msg: String) {
     android.widget.Toast.makeText(context.applicationContext, msg, android.widget.Toast.LENGTH_SHORT).show()
 }
@@ -346,7 +325,6 @@ fun getCurrentDownloadFolder(context: Context): String {
     return "${Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)}/nosved"
 }
 
-// Optimized storage calculation - moved to background thread
 suspend fun getStorageInfoOptimized(context: Context): Pair<String, String> {
     return withContext(Dispatchers.IO) {
         try {
