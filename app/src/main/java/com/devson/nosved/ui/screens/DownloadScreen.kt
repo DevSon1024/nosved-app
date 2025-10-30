@@ -247,7 +247,7 @@ fun ModernDownloadItem(
             .padding(horizontal = 8.dp, vertical = 4.dp)
             .clickable {
                 if (download.status == DownloadStatus.COMPLETED && !download.filePath.isNullOrEmpty()) {
-                    onPlayVideo(download.filePath)
+                    onPlayVideo(download.filePath!!)
                 }
             },
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
@@ -396,7 +396,7 @@ fun ModernDownloadItem(
                         }
 
                         // File size and format
-                        if (download.fileSize != null) {
+                        if (download.fileSize > 0) { // Updated check
                             Text(
                                 text = "•",
                                 style = MaterialTheme.typography.bodySmall,
@@ -506,7 +506,7 @@ fun ModernDownloadItem(
                             DropdownMenuItem(
                                 text = { Text("Play") },
                                 onClick = {
-                                    onPlayVideo(download.filePath)
+                                    onPlayVideo(download.filePath!!)
                                     showMenu = false
                                 },
                                 leadingIcon = {
@@ -516,7 +516,7 @@ fun ModernDownloadItem(
                             DropdownMenuItem(
                                 text = { Text("Share") },
                                 onClick = {
-                                    onShareVideo(download.filePath)
+                                    onShareVideo(download.filePath!!)
                                     showMenu = false
                                 },
                                 leadingIcon = {

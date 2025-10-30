@@ -159,7 +159,10 @@ object VideoInfoUtil {
             }
         }
 
-        return YoutubeDL.getInstance().getInfo(url)
+        // --- FIX ---
+        // Was: return YoutubeDL.getInstance().getInfo(url)
+        // Now:
+        return YoutubeDL.getInstance().getInfo(request)
     }
 
     private suspend fun extractStandard(url: String, config: PlatformConfig): VideoInfo {
@@ -175,7 +178,10 @@ object VideoInfoUtil {
             }
         }
 
-        return YoutubeDL.getInstance().getInfo(url)
+        // --- FIX ---
+        // Was: return YoutubeDL.getInstance().getInfo(url)
+        // Now:
+        return YoutubeDL.getInstance().getInfo(request)
     }
 
     private fun isValidVideoUrl(url: String): Boolean {
