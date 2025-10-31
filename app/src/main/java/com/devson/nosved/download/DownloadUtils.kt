@@ -1,7 +1,6 @@
 package com.devson.nosved.download
 
 import java.io.File
-
 /**
  * Extracts the download speed (e.g., "1.2MiB/s") from a yt-dlp progress line.
  */
@@ -23,7 +22,7 @@ fun extractETA(line: String): String {
  */
 fun sanitizeTitle(title: String): String {
     return title
-        .replace(Regex("[^a-zA-Z0-9\\s.-]"), "") // Remove special chars but keep spaces, dots, hyphens
+        .replace(Regex("[^a-zA-Z0-9\\s.-]"), "-") // Remove special chars but keep spaces, dots, hyphens
         .replace(Regex("\\s+"), " ") // Replace multiple spaces with single space
         .trim()
         .take(100) // Limit length to prevent issues
