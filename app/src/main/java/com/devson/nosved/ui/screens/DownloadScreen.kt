@@ -1,3 +1,4 @@
+// app/src/main/java/com/devson/nosved/ui/screens/DownloadScreen.kt
 package com.devson.nosved.ui.screens
 
 import android.content.Context
@@ -121,6 +122,8 @@ private fun handleDownloadAction(
         is DownloadAction.Retry -> viewModel.retryDownload(action.downloadId)
         is DownloadAction.Cancel -> viewModel.cancelDownload(action.downloadId)
         is DownloadAction.Delete -> viewModel.deleteDownload(action.downloadId)
+        is DownloadAction.RemoveFromApp -> viewModel.removeFromApp(action.downloadId)
+        is DownloadAction.Redownload -> viewModel.redownloadVideo(action.downloadId, action.sameQuality)
     }
 }
 

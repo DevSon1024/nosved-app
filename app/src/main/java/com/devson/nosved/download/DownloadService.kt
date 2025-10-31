@@ -289,6 +289,16 @@ class DownloadService(
             // For this refactor, we just set the status to QUEUED.
         }
     }
+    suspend fun removeFromApp(downloadId: String) = withContext(Dispatchers.IO) {
+        val download = repository.getDownloadById(downloadId)
+        repository.deleteDownload(downloadId)
+        download?.let {
+            showToast("Removed from app: ${it.title}")
+        }
+    }
+    suspend fun getDownloadById(downloadId: String): DownloadEntity? = withContext(Dispatchers.IO) {
+        return@withContext repository.getDownloadById(downloadId)
+    }
 
     /**
      * Deletes a download from the repository and filesystem.

@@ -287,12 +287,40 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun removeFromApp(downloadId: String) {
+        viewModelScope.launch {
+            downloadService.removeFromApp(downloadId)
+        }
+    }
+
     /**
      * Delegate retry to the DownloadService.
      */
     fun retryDownload(downloadId: String) {
         viewModelScope.launch {
             downloadService.retryDownload(downloadId)
+        }
+    }
+    fun redownloadVideo(downloadId: String, sameQuality: Boolean) {
+        viewModelScope.launch {
+            val download = downloadService.getDownloadById(downloadId)
+            if (download != null) {
+                if (sameQuality) {
+                    // Use the stored quality preferences to redownload with same quality
+                    showToast("🔄 Redownloading with same quality...")
+
+                    // Fetch video info again and download with same quality
+                    fetchVideoInfoForRedownload(download.url, download.videoFormat, download.audioFormat, download.title)
+                } else {
+                    // Set the URL and fetch video info for user to choose quality
+                    _currentUrl.value = download.url
+                    showToast("🔍 Fetching video info for quality selection...")
+                    fetchVideoInfo(download.url)
+                }
+
+                // Remove the old entry from database
+                downloadService.removeFromApp(downloadId)
+            }
         }
     }
 
@@ -302,6 +330,49 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun deleteDownload(downloadId: String) {
         viewModelScope.launch {
             downloadService.deleteDownload(downloadId)
+        }
+    }
+
+    private fun fetchVideoInfoForRedownload(
+        url: String,
+        videoFormat: String?,
+        audioFormat: String?,
+        title: String
+    ) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                VideoInfoUtil.fetchVideoInfoProgressive(url) { progress ->
+                    when (progress.stage) {
+                        "Complete", "Cache hit" -> {
+                            progress.basicInfo?.let { info ->
+                                // Parse the stored format preferences
+                                val videoQuality = videoFormat?.replace("p", "") ?: "720"
+                                val audioQuality = audioFormat?.replace("kbps", "") ?: "128"
+
+                                // Determine download mode based on stored formats
+                                val downloadMode = if (videoFormat == "Audio Only") {
+                                    DownloadMode.AUDIO_ONLY
+                                } else {
+                                    DownloadMode.VIDEO_AUDIO
+                                }
+
+                                // Start download with same quality
+                                downloadVideoWithQuality(
+                                    videoInfo = info,
+                                    customTitle = title,
+                                    downloadMode = downloadMode,
+                                    preferredVideoQuality = "${videoQuality}p",
+                                    preferredAudioQuality = "${audioQuality}kbps"
+                                )
+                            }
+                        }
+                    }
+                }.onFailure { exception ->
+                    showToast("❌ Failed to fetch video info for redownload: ${exception.message}")
+                }
+            } catch (e: Exception) {
+                showToast("❌ Redownload failed: ${e.message}")
+            }
         }
     }
 

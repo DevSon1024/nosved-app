@@ -1,3 +1,4 @@
+// app/src/main/java/com/devson/nosved/ui/model/DownloadTypes.kt
 package com.devson.nosved.ui.model
 
 enum class DownloadTabType {
@@ -17,4 +18,6 @@ sealed class DownloadAction {
     data class Retry(val downloadId: String) : DownloadAction()
     data class Cancel(val downloadId: String) : DownloadAction()
     data class Delete(val downloadId: String) : DownloadAction()
+    data class Redownload(val downloadId: String, val sameQuality: Boolean = true) : DownloadAction()
+    data class RemoveFromApp(val downloadId: String) : DownloadAction()
 }
