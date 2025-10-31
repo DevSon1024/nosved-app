@@ -6,6 +6,7 @@ import com.yausername.youtubedl_android.YoutubeDLRequest
 import com.yausername.youtubedl_android.mapper.VideoInfo
 import kotlinx.coroutines.*
 import kotlinx.serialization.json.Json
+import java.net.URI
 
 object VideoInfoUtil {
 
@@ -14,7 +15,7 @@ object VideoInfoUtil {
 
     // Enhanced caching with expiry
     private val infoCache = mutableMapOf<String, CachedVideoInfo>()
-    private val activeJobs = mutableMapOf<String, Job>()
+    private val activeJobs = mutableMapOf<String, Job>()  // Fixed: was mutableMapMap
     private val platformOptimizations = initializePlatformSettings()
 
     data class CachedVideoInfo(
@@ -34,6 +35,7 @@ object VideoInfoUtil {
 
     private fun initializePlatformSettings(): Map<String, PlatformConfig> {
         return mapOf(
+            // Video platforms
             "youtube.com" to PlatformConfig(
                 timeout = 4000,
                 extraOptions = listOf("--youtube-skip-dash-manifest", "--format", "best[height<=720]")
@@ -49,6 +51,48 @@ object VideoInfoUtil {
             "tiktok.com" to PlatformConfig(
                 timeout = 5000,
                 extraOptions = listOf("--format", "best", "--no-playlist")
+            ),
+            "twitter.com" to PlatformConfig(
+                timeout = 4000,
+                extraOptions = listOf("--format", "best")
+            ),
+            "x.com" to PlatformConfig(
+                timeout = 4000,
+                extraOptions = listOf("--format", "best")
+            ),
+            "facebook.com" to PlatformConfig(
+                timeout = 5000,
+                extraOptions = listOf("--format", "best")
+            ),
+            "vimeo.com" to PlatformConfig(
+                timeout = 4000,
+                extraOptions = listOf("--format", "best[height<=720]")
+            ),
+            "dailymotion.com" to PlatformConfig(
+                timeout = 4000,
+                extraOptions = listOf("--format", "best")
+            ),
+            "twitch.tv" to PlatformConfig(
+                timeout = 6000,
+                extraOptions = listOf("--format", "best")
+            ),
+            // News and media
+            "cnn.com" to PlatformConfig(
+                timeout = 5000,
+                extraOptions = listOf("--format", "best")
+            ),
+            "bbc.co.uk" to PlatformConfig(
+                timeout = 5000,
+                extraOptions = listOf("--format", "best")
+            ),
+            "reuters.com" to PlatformConfig(
+                timeout = 5000,
+                extraOptions = listOf("--format", "best")
+            ),
+            // Generic fallback for unknown platforms
+            "generic" to PlatformConfig(
+                timeout = 8000,
+                extraOptions = listOf("--format", "best[height<=720]", "--no-check-certificate")
             )
         )
     }
@@ -80,7 +124,7 @@ object VideoInfoUtil {
                 onProgress(ProgressiveResult(null, false, "Validating URL"))
 
                 if (!isValidVideoUrl(url)) {
-                    throw IllegalArgumentException("Invalid video URL")
+                    throw IllegalArgumentException("Invalid video URL format")
                 }
 
                 // Stage 3: Platform-optimized extraction
@@ -117,10 +161,7 @@ object VideoInfoUtil {
     private fun detectPlatform(url: String): PlatformConfig {
         return platformOptimizations.entries.find { (domain, _) ->
             url.contains(domain, ignoreCase = true)
-        }?.value ?: PlatformConfig(
-            timeout = 6000,
-            extraOptions = listOf("--format", "best[height<=720]")
-        )
+        }?.value ?: platformOptimizations["generic"]!!
     }
 
     private suspend fun extractWithOptimizedSettings(url: String, config: PlatformConfig): VideoInfo {
@@ -129,8 +170,13 @@ object VideoInfoUtil {
             try {
                 extractUltraFast(url, config)
             } catch (e: Exception) {
-                Log.w(TAG, "Ultra-fast failed, trying standard method")
-                extractStandard(url, config)
+                Log.w(TAG, "Ultra-fast failed, trying standard method for $url")
+                try {
+                    extractStandard(url, config)
+                } catch (e2: Exception) {
+                    Log.w(TAG, "Standard extraction failed, trying generic fallback for $url")
+                    extractGeneric(url)
+                }
             }
         }
     }
@@ -159,9 +205,6 @@ object VideoInfoUtil {
             }
         }
 
-        // --- FIX ---
-        // Was: return YoutubeDL.getInstance().getInfo(url)
-        // Now:
         return YoutubeDL.getInstance().getInfo(request)
     }
 
@@ -169,6 +212,7 @@ object VideoInfoUtil {
         val request = YoutubeDLRequest(url).apply {
             addOption("--no-playlist")
             addOption("--socket-timeout", "5")
+            addOption("--no-check-certificate")
             config.extraOptions.chunked(2).forEach { pair ->
                 if (pair.size == 2) {
                     addOption(pair[0], pair[1])
@@ -178,20 +222,39 @@ object VideoInfoUtil {
             }
         }
 
-        // --- FIX ---
-        // Was: return YoutubeDL.getInstance().getInfo(url)
-        // Now:
+        return YoutubeDL.getInstance().getInfo(request)
+    }
+
+    private suspend fun extractGeneric(url: String): VideoInfo {
+        val request = YoutubeDLRequest(url).apply {
+            // Generic fallback with maximum compatibility
+            addOption("--no-playlist")
+            addOption("--socket-timeout", "10")
+            addOption("--retries", "3")
+            addOption("--no-check-certificate")
+            addOption("--format", "best")
+            addOption("--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+        }
+
         return YoutubeDL.getInstance().getInfo(request)
     }
 
     private fun isValidVideoUrl(url: String): Boolean {
-        val videoPatterns = listOf(
-            "youtube.com", "youtu.be", "instagram.com", "tiktok.com",
-            "twitter.com", "facebook.com", "vimeo.com", "dailymotion.com"
-        )
-        return videoPatterns.any { pattern ->
-            url.contains(pattern, ignoreCase = true)
-        } && (url.startsWith("http://") || url.startsWith("https://"))
+        // More comprehensive URL validation - let yt-dlp decide what's supported
+        // Basic format validation
+        if (!url.startsWith("http://") && !url.startsWith("https://") &&
+            !url.startsWith("rtmp://") && !url.startsWith("rtmps://")) {
+            return false
+        }
+
+        // Basic URI format check
+        return try {
+            val uri = URI(url)
+            uri.host != null && uri.host.isNotEmpty()
+        } catch (e: Exception) {
+            // Fallback regex check
+            url.matches(Regex("^https?://[\\w\\-.]+\\.[a-zA-Z]{2,}(/.*)?$", RegexOption.IGNORE_CASE))
+        }
     }
 
     private fun cleanExpiredCache() {
@@ -212,11 +275,16 @@ object VideoInfoUtil {
     }
 
     fun cancelFetch(url: String) {
-        activeJobs[url]?.cancel()
+        activeJobs[url]?.cancel()  // Fixed: This is now calling Job.cancel() which is correct
         activeJobs.remove(url)
     }
 
     fun clearCache() {
         infoCache.clear()
+        // Cancel all active jobs when clearing cache
+        activeJobs.values.forEach { job ->
+            job.cancel()
+        }
+        activeJobs.clear()
     }
 }

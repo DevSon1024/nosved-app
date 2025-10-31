@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.io.File
 import java.util.*
+import java.net.URI
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -76,12 +77,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         currentFetchJob?.cancel()
     }
 
-    // This function is just for URL state management, it's fine
+    // Updated to use the more comprehensive URL validation
     private fun isValidUrl(url: String): Boolean {
-        return url.startsWith("http://") || url.startsWith("https://") ||
-                url.contains("youtube.com") || url.contains("youtu.be") ||
-                url.contains("instagram.com") || url.contains("tiktok.com") ||
-                url.contains("twitter.com") || url.contains("facebook.com")
+        return isValidUrlComprehensive(url)
     }
 
     // This is UI logic, keep it
@@ -126,7 +124,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         exception is TimeoutCancellationException -> "⏱️ Request timed out - try again"
                         exception.message?.contains("network") == true -> "🌐 Network error - check connection"
                         exception.message?.contains("Invalid") == true -> "❌ Invalid or unsupported URL"
-                        else -> "❌ Failed to get video info"
+                        exception.message?.contains("Unsupported URL") == true -> "❌ This site is not supported by yt-dlp"
+                        exception.message?.contains("No video formats found") == true -> "❌ No downloadable video found"
+                        else -> "❌ Failed to get video info: ${exception.message}"
                     }
                     showToast(errorMessage)
                 }
@@ -336,11 +336,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             if (clipData != null && clipData.itemCount > 0) {
                 val pastedText = clipData.getItemAt(0).text?.toString() ?: ""
                 _currentUrl.value = pastedText
-                if (pastedText.isNotBlank() && isValidUrlQuick(pastedText)) {
+                if (pastedText.isNotBlank() && isValidUrlComprehensive(pastedText)) {
                     showToast("🔗 URL pasted - fetching info...")
                     fetchVideoInfo(pastedText)
                 } else if (pastedText.isNotBlank()) {
-                    showToast("⚠️ Invalid URL format")
+                    showToast("⚠️ URL format may not be supported - trying anyway...")
+                    fetchVideoInfo(pastedText)
                 }
                 pastedText
             } else {
@@ -353,15 +354,57 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // This is UI/Clipboard logic, keep it
-    private fun isValidUrlQuick(url: String): Boolean {
-        return (url.startsWith("http://") || url.startsWith("https://")) &&
-                (url.contains("youtube.com") || url.contains("youtu.be") ||
-                        url.contains("instagram.com") || url.contains("tiktok.com") ||
-                        url.contains("twitter.com") || url.contains("facebook.com") ||
-                        url.contains("vimeo.com"))
+    // Updated comprehensive URL validation that covers all yt-dlp supported sites
+    private fun isValidUrlComprehensive(url: String): Boolean {
+        // First check if it's a valid URL format
+        if (!isValidUrlFormat(url)) return false
+
+        // Let yt-dlp handle the validation - it knows best what it can support
+        // We'll do a basic check for common protocols and formats
+        val urlLower = url.lowercase()
+
+        // Support HTTP/HTTPS URLs
+        if (urlLower.startsWith("http://") || urlLower.startsWith("https://")) {
+            return true
+        }
+
+        // Support some common streaming protocols
+        if (urlLower.startsWith("rtmp://") ||
+            urlLower.startsWith("rtmps://") ||
+            urlLower.startsWith("m3u8://") ||
+            urlLower.startsWith("hls://")) {
+            return true
+        }
+
+        // If it contains a domain with common TLDs, likely valid
+        if (containsValidDomain(urlLower)) {
+            return true
+        }
+
+        return false
     }
 
+    private fun isValidUrlFormat(url: String): Boolean {
+        return try {
+            val uri = URI(url)
+            uri.scheme != null && uri.host != null
+        } catch (e: Exception) {
+            // Try a simpler regex-based validation
+            url.matches(Regex("^https?://[\\w\\-.]+(:\\d+)?(/.*)?$", RegexOption.IGNORE_CASE)) ||
+                    url.matches(Regex("^[a-zA-Z][a-zA-Z0-9+.-]*://.*", RegexOption.IGNORE_CASE))
+        }
+    }
+
+    private fun containsValidDomain(url: String): Boolean {
+        val commonTlds = listOf(
+            ".com", ".org", ".net", ".edu", ".gov", ".mil", ".int",
+            ".co.uk", ".de", ".fr", ".jp", ".cn", ".ru", ".br",
+            ".ca", ".au", ".in", ".it", ".nl", ".es", ".kr",
+            ".tv", ".me", ".io", ".ly", ".be", ".cc", ".to"
+        )
+
+        return commonTlds.any { tld -> url.contains(tld) }
+    }
 
     override fun onCleared() {
         super.onCleared()
