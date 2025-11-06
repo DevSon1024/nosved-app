@@ -19,11 +19,17 @@ fun extractETA(line: String): String {
 
 /**
  * Sanitizes a video title to be used as a safe filename.
+ * This version is less restrictive to allow emojis and special characters,
+ * only removing characters that are illegal in file paths.
  */
 fun sanitizeTitle(title: String): String {
+    // Regex to match illegal filesystem characters: / \ ? % * : | " < >
+    // and control characters (0x00-0x1F)
+    val illegalCharsRegex = Regex("[/\\\\?%*:|\"<>\\x00-\\x1F]")
+
     return title
-        .replace(Regex("[^a-zA-Z0-9\\s.-]"), "-") // Remove special chars but keep spaces, dots, hyphens
+        .replace(illegalCharsRegex, "-") // Replace illegal chars with a hyphen
         .replace(Regex("\\s+"), " ") // Replace multiple spaces with single space
         .trim()
-        .take(100) // Limit length to prevent issues
+        .take(200) // Increase max length
 }

@@ -17,6 +17,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.UUID
+import kotlin.math.abs
 
 /**
  * Service class to handle the execution of downloads.
@@ -30,8 +31,8 @@ class DownloadService(
     private val coroutineScope: CoroutineScope
 ) {
 
-    // No longer needed, as we won't be killing the process directly
-    // private val activeDownloadJobs = mutableMapOf<String, YoutubeDLRequest>()
+    // Helper to generate a stable, unique integer ID for notifications
+    private fun getNotificationId(downloadId: String): Int = abs(downloadId.hashCode())
 
     /**
      * Creates a new DownloadEntity for a video and audio merge,
@@ -41,10 +42,13 @@ class DownloadService(
         videoInfo: VideoInfo,
         videoFormat: VideoFormat,
         audioFormat: VideoFormat,
-        customTitle: String
+        customTitle: String,
+        downloadSubtitles: Boolean, // Added for subtitles
+        subtitleLang: String      // Added for subtitles
     ) {
         val downloadId = UUID.randomUUID().toString()
         val totalSize = (videoFormat.fileSize ?: 0L) + (audioFormat.fileSize ?: 0L)
+        // Use the new, less restrictive sanitizeTitle function
         val titleToUse = customTitle.ifBlank { videoInfo.title ?: "Unknown Title" }
         val sanitizedTitle = sanitizeTitle(titleToUse)
         val outputExtension = "mp4" // Merged format
@@ -62,12 +66,21 @@ class DownloadService(
             uploader = videoInfo.uploader,
             videoFormat = "${videoFormat.height}p",
             audioFormat = "${audioFormat.abr}kbps"
+            // You could also store subtitle info here
         )
 
         repository.insertDownload(downloadEntity)
         showToast("Download started: $titleToUse")
 
-        executeVideoDownload(downloadEntity, videoFormat, audioFormat, sanitizedTitle, outputExtension)
+        executeVideoDownload(
+            downloadEntity,
+            videoFormat,
+            audioFormat,
+            sanitizedTitle,
+            outputExtension,
+            downloadSubtitles,
+            subtitleLang
+        )
     }
 
     /**
@@ -78,9 +91,12 @@ class DownloadService(
         videoFormat: VideoFormat,
         audioFormat: VideoFormat,
         sanitizedTitle: String,
-        outputExtension: String
+        outputExtension: String,
+        downloadSubtitles: Boolean, // Added
+        subtitleLang: String      // Added
     ) = withContext(Dispatchers.IO) {
         val downloadId = downloadEntity.id
+        val notificationId = getNotificationId(downloadId) // Get unique ID
         try {
             repository.updateDownloadStatus(downloadId, DownloadStatus.DOWNLOADING)
             val downloadDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
@@ -101,6 +117,14 @@ class DownloadService(
             request.addOption("--retries", "3")
             request.addOption("--fragment-retries", "3")
 
+            // Add Subtitle Options
+            if (downloadSubtitles) {
+                request.addOption("--write-subs")
+                request.addOption("--sub-lang", subtitleLang)
+                request.addOption("--embed-subs") // Embed into video file
+                request.addOption("--convert-subs", "srt") // Convert to srt first
+            }
+
             YoutubeDL.getInstance().execute(request) { progress, _, line ->
                 coroutineScope.launch(Dispatchers.IO) {
                     val progressData = DownloadProgress(
@@ -113,12 +137,14 @@ class DownloadService(
                     )
                     progressFlow.value = progressFlow.value + (downloadId to progressData)
                     repository.updateDownloadProgress(downloadId, progressData.progress, 0L)
-                    notificationHelper.showDownloadProgressNotification(line)
+                    // Use new notification method
+                    notificationHelper.showDownloadProgressNotification(notificationId, downloadEntity.title, line)
                 }
             }
 
             // Check if job was cancelled
             if (repository.getDownloadById(downloadId)?.status == DownloadStatus.CANCELLED) {
+                notificationHelper.cancelNotification(notificationId) // Cancel notification
                 return@withContext
             }
 
@@ -132,7 +158,8 @@ class DownloadService(
                 )
             )
             showToast("✅ Download completed: ${downloadEntity.title}")
-            notificationHelper.showDownloadCompleteNotification(downloadEntity.title, finalFilePath.absolutePath)
+            // Show complete notification (replaces progress one)
+            notificationHelper.showDownloadCompleteNotification(notificationId, downloadEntity.title, finalFilePath.absolutePath)
 
         } catch (e: Exception) {
             // Check if status is CANCELLED before reporting a failure
@@ -147,6 +174,7 @@ class DownloadService(
                     )
                 )
             }
+            notificationHelper.cancelNotification(notificationId) // Cancel on failure/cancel
         } finally {
             progressFlow.value = progressFlow.value - downloadId
         }
@@ -159,10 +187,13 @@ class DownloadService(
     suspend fun startAudioDownload(
         videoInfo: VideoInfo,
         audioFormat: VideoFormat,
-        customTitle: String
+        customTitle: String,
+        downloadSubtitles: Boolean, // Added
+        subtitleLang: String      // Added
     ) {
         val downloadId = UUID.randomUUID().toString()
         val titleToUse = customTitle.ifBlank { videoInfo.title ?: "Unknown Title" }
+        // Use the new, less restrictive sanitizeTitle function
         val sanitizedTitle = sanitizeTitle(titleToUse)
         val audioExtension = audioFormat.ext ?: "mp3"
 
@@ -184,7 +215,14 @@ class DownloadService(
         repository.insertDownload(downloadEntity)
         showToast("Audio download started: $titleToUse")
 
-        executeAudioDownload(downloadEntity, audioFormat, sanitizedTitle, audioExtension)
+        executeAudioDownload(
+            downloadEntity,
+            audioFormat,
+            sanitizedTitle,
+            audioExtension,
+            downloadSubtitles,
+            subtitleLang
+        )
     }
 
     /**
@@ -194,9 +232,12 @@ class DownloadService(
         downloadEntity: DownloadEntity,
         audioFormat: VideoFormat,
         sanitizedTitle: String,
-        audioExtension: String
+        audioExtension: String,
+        downloadSubtitles: Boolean, // Added
+        subtitleLang: String      // Added
     ) = withContext(Dispatchers.IO) {
         val downloadId = downloadEntity.id
+        val notificationId = getNotificationId(downloadId) // Get unique ID
         try {
             repository.updateDownloadStatus(downloadId, DownloadStatus.DOWNLOADING)
             val downloadDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
@@ -213,6 +254,14 @@ class DownloadService(
             request.addOption("--audio-format", audioExtension)
             request.addOption("--no-warnings")
 
+            // Add Subtitle Options
+            if (downloadSubtitles) {
+                request.addOption("--write-subs")
+                request.addOption("--sub-lang", subtitleLang)
+                request.addOption("--convert-subs", "srt")
+                // Don't embed subs in audio, just save as separate file
+            }
+
             YoutubeDL.getInstance().execute(request) { progress, _, line ->
                 coroutineScope.launch(Dispatchers.IO) {
                     val progressData = DownloadProgress(
@@ -225,11 +274,13 @@ class DownloadService(
                     )
                     progressFlow.value = progressFlow.value + (downloadId to progressData)
                     repository.updateDownloadProgress(downloadId, progressData.progress, 0L)
-                    notificationHelper.showDownloadProgressNotification(line)
+                    // Use new notification method
+                    notificationHelper.showDownloadProgressNotification(notificationId, downloadEntity.title, line)
                 }
             }
 
             if (repository.getDownloadById(downloadId)?.status == DownloadStatus.CANCELLED) {
+                notificationHelper.cancelNotification(notificationId) // Cancel notification
                 return@withContext
             }
 
@@ -243,7 +294,8 @@ class DownloadService(
                 )
             )
             showToast("✅ Audio download completed: ${downloadEntity.title}")
-            notificationHelper.showDownloadCompleteNotification(downloadEntity.title, finalFilePath.absolutePath)
+            // Show complete notification (replaces progress one)
+            notificationHelper.showDownloadCompleteNotification(notificationId, downloadEntity.title, finalFilePath.absolutePath)
 
         } catch (e: Exception) {
             if (repository.getDownloadById(downloadId)?.status == DownloadStatus.CANCELLED) {
@@ -257,6 +309,7 @@ class DownloadService(
                     )
                 )
             }
+            notificationHelper.cancelNotification(notificationId) // Cancel on failure/cancel
         } finally {
             progressFlow.value = progressFlow.value - downloadId
         }
@@ -269,6 +322,9 @@ class DownloadService(
     suspend fun cancelDownload(downloadId: String) = withContext(Dispatchers.IO) {
         val download = repository.getDownloadById(downloadId)
         repository.updateDownloadStatus(downloadId, DownloadStatus.CANCELLED)
+
+        // Also cancel its notification
+        notificationHelper.cancelNotification(getNotificationId(downloadId))
 
         progressFlow.value = progressFlow.value - downloadId
         download?.let { showToast("Download cancelled: ${it.title}") }
@@ -287,6 +343,8 @@ class DownloadService(
             // In a real app, you would re-launch the appropriate
             // executeVideoDownload or executeAudioDownload function here.
             // For this refactor, we just set the status to QUEUED.
+            // You would need to re-trigger the download from the ViewModel
+            // or pass subtitle/format info here.
         }
     }
     suspend fun removeFromApp(downloadId: String) = withContext(Dispatchers.IO) {
@@ -306,6 +364,7 @@ class DownloadService(
     suspend fun deleteDownload(downloadId: String) = withContext(Dispatchers.IO) {
         val title = repository.getDownloadById(downloadId)?.title
         repository.deleteDownload(downloadId)
+        // You might also want to delete the file from disk here
         title?.let { showToast("Download deleted: $it") }
     }
 

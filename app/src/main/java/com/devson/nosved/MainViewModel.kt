@@ -223,6 +223,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     /**
      * This function now delegates the actual download to the DownloadService.
+     * Added subtitle parameters.
      */
     fun downloadVideoWithQuality(
         videoInfo: VideoInfo,
@@ -231,7 +232,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         preferredVideoQuality: String,
         preferredAudioQuality: String,
         preferredAudioContainer: String = "m4a",
-        preferredVideoContainer: String = "mp4"
+        preferredVideoContainer: String = "mp4",
+        downloadSubtitles: Boolean = false, // Added
+        subtitleLang: String = "en,best"  // Added (e.g., "en" or "en,es" or "best")
     ) {
         viewModelScope.launch (Dispatchers.IO) {
             val formats = videoInfo.formats ?: return@launch
@@ -246,7 +249,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
                     if (selectedAudio != null) {
                         // Delegate to service
-                        downloadService.startAudioDownload(videoInfo, selectedAudio, customTitle)
+                        downloadService.startAudioDownload(
+                            videoInfo,
+                            selectedAudio,
+                            customTitle,
+                            downloadSubtitles,
+                            subtitleLang
+                        )
                         _selectedAudioFormat.value = selectedAudio
                         _selectedVideoFormat.value = null
                     } else showToast("❌ No suitable audio format found.")
@@ -259,7 +268,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
                     if (selectedVideo != null && selectedAudio != null) {
                         // Delegate to service
-                        downloadService.startVideoDownload(videoInfo, selectedVideo, selectedAudio, customTitle)
+                        downloadService.startVideoDownload(
+                            videoInfo,
+                            selectedVideo,
+                            selectedAudio,
+                            customTitle,
+                            downloadSubtitles,
+                            subtitleLang
+                        )
                         _selectedVideoFormat.value = selectedVideo
                         _selectedAudioFormat.value = selectedAudio
                     } else showToast("❌ No suitable video/audio format found.")
@@ -274,7 +290,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      */
     fun downloadVideo(videoInfo: VideoInfo, videoFormat: VideoFormat, audioFormat: VideoFormat, customTitle: String) {
         viewModelScope.launch (Dispatchers.IO) {
-            downloadService.startVideoDownload(videoInfo, videoFormat, audioFormat, customTitle)
+            // Pass default subtitle values (false)
+            downloadService.startVideoDownload(
+                videoInfo,
+                videoFormat,
+                audioFormat,
+                customTitle,
+                false,
+                ""
+            )
         }
     }
 
@@ -310,7 +334,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     showToast("🔄 Redownloading with same quality...")
 
                     // Fetch video info again and download with same quality
-                    fetchVideoInfoForRedownload(download.url, download.videoFormat, download.audioFormat, download.title)
+                    // We don't have subtitle info stored, so we default to false.
+                    fetchVideoInfoForRedownload(
+                        download.url,
+                        download.videoFormat,
+                        download.audioFormat,
+                        download.title,
+                        false, // Defaulting to no subtitles
+                        "en,best"
+                    )
                 } else {
                     // Set the URL and fetch video info for user to choose quality
                     _currentUrl.value = download.url
@@ -337,7 +369,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         url: String,
         videoFormat: String?,
         audioFormat: String?,
-        title: String
+        title: String,
+        downloadSubtitles: Boolean, // Added
+        subtitleLang: String      // Added
     ) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
@@ -362,7 +396,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                     customTitle = title,
                                     downloadMode = downloadMode,
                                     preferredVideoQuality = "${videoQuality}p",
-                                    preferredAudioQuality = "${audioQuality}kbps"
+                                    preferredAudioQuality = "${audioQuality}kbps",
+                                    downloadSubtitles = downloadSubtitles,
+                                    subtitleLang = subtitleLang
                                 )
                             }
                         }
