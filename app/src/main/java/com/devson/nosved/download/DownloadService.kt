@@ -6,6 +6,7 @@ import com.devson.nosved.NotificationHelper
 import com.devson.nosved.data.DownloadEntity
 import com.devson.nosved.data.DownloadProgress
 import com.devson.nosved.data.DownloadStatus
+import com.devson.nosved.util.VideoInfoUtil
 import com.yausername.youtubedl_android.YoutubeDL
 import com.yausername.youtubedl_android.YoutubeDLRequest
 import com.yausername.youtubedl_android.mapper.VideoFormat
@@ -16,7 +17,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
-import java.util.UUID
+import java.util.*
 import kotlin.math.abs
 
 /**
@@ -98,7 +99,10 @@ class DownloadService(
         val downloadId = downloadEntity.id
         val notificationId = getNotificationId(downloadId) // Get unique ID
         try {
-            repository.updateDownloadStatus(downloadId, DownloadStatus.DOWNLOADING)
+            // Only update to DOWNLOADING if it's not already
+            if (repository.getDownloadById(downloadId)?.status != DownloadStatus.DOWNLOADING) {
+                repository.updateDownloadStatus(downloadId, DownloadStatus.DOWNLOADING)
+            }
             val downloadDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
             val nosvedDir = File(downloadDir, "nosved")
             if (!nosvedDir.exists()) nosvedDir.mkdirs()
@@ -154,7 +158,8 @@ class DownloadService(
                     filePath = finalFilePath.absolutePath,
                     fileName = "${sanitizedTitle}.${outputExtension}",
                     completedAt = System.currentTimeMillis(),
-                    progress = 100
+                    progress = 100,
+                    error = null // Clear any previous error
                 )
             )
             showToast("✅ Download completed: ${downloadEntity.title}")
@@ -239,7 +244,10 @@ class DownloadService(
         val downloadId = downloadEntity.id
         val notificationId = getNotificationId(downloadId) // Get unique ID
         try {
-            repository.updateDownloadStatus(downloadId, DownloadStatus.DOWNLOADING)
+            // Only update to DOWNLOADING if it's not already
+            if (repository.getDownloadById(downloadId)?.status != DownloadStatus.DOWNLOADING) {
+                repository.updateDownloadStatus(downloadId, DownloadStatus.DOWNLOADING)
+            }
             val downloadDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
             val nosvedDir = File(downloadDir, "nosved")
             if (!nosvedDir.exists()) nosvedDir.mkdirs()
@@ -290,7 +298,8 @@ class DownloadService(
                     filePath = finalFilePath.absolutePath,
                     fileName = "${sanitizedTitle}.${audioExtension}",
                     completedAt = System.currentTimeMillis(),
-                    progress = 100
+                    progress = 100,
+                    error = null // Clear any previous error
                 )
             )
             showToast("✅ Audio download completed: ${downloadEntity.title}")
@@ -315,6 +324,170 @@ class DownloadService(
         }
     }
 
+    // *** HELPER FUNCTIONS (Copied from MainViewModel) ***
+
+    private fun findNearestAudioFormat(
+        formats: List<VideoFormat>,
+        preferredBitrate: Int,
+        preferredContainer: String
+    ): VideoFormat? {
+        val candidates = formats.filter {
+            it.vcodec == "none" &&
+                    it.acodec != "none" &&
+                    it.abr != null &&
+                    it.ext.equals(preferredContainer, ignoreCase = true)
+        }
+        val lowerOrEqual = candidates.filter { (it.abr ?: 0) <= preferredBitrate }
+            .sortedByDescending { it.abr }
+        if (lowerOrEqual.isNotEmpty()) return lowerOrEqual.first()
+        return candidates.maxByOrNull { it.abr ?: 0 }
+    }
+
+    private fun findNearestVideoFormat(
+        formats: List<VideoFormat>,
+        preferredHeight: Int,
+        preferredContainer: String
+    ): VideoFormat? {
+        val candidates = formats.filter {
+            it.vcodec != "none" &&
+                    it.acodec == "none" &&
+                    it.height != null &&
+                    it.ext.equals(preferredContainer, ignoreCase = true)
+        }
+        val lowerOrEqual = candidates.filter { (it.height ?: 0) <= preferredHeight }
+            .sortedByDescending { it.height }
+        if (lowerOrEqual.isNotEmpty()) return lowerOrEqual.first()
+        return candidates.maxByOrNull { it.height ?: 0 }
+    }
+
+    private fun parseQualityFromString(q: String?): Int {
+        if (q == null) return 0
+        return q.lowercase(Locale.ROOT)
+            .replace("p", "")
+            .replace("kbps", "")
+            .trim()
+            .toIntOrNull() ?: 0
+    }
+
+    // *** END OF HELPER FUNCTIONS ***
+
+
+    /**
+     * Re-downloads an existing item using its stored quality settings.
+     * This will reset the item's progress and re-fetch formats.
+     */
+    suspend fun redownloadVideoItem(downloadId: String) = withContext(Dispatchers.IO) {
+        val existingEntity = repository.getDownloadById(downloadId)
+        if (existingEntity == null) {
+            showToast("❌ Redownload failed: Item not found")
+            return@withContext
+        }
+
+        // 1. Show immediate feedback
+        showToast("🔄 Re-fetching info for redownload...")
+
+        // 2. Update status to QUEUED immediately
+        // We set filePath to null so it's clear the old file is invalid
+        val queuedEntity = existingEntity.copy(
+            status = DownloadStatus.QUEUED,
+            progress = 0,
+            completedAt = null,
+            error = null,
+            filePath = null, // Old file path is no longer valid
+            fileName = null
+        )
+        repository.updateDownload(queuedEntity)
+
+        // 3. Delete the old file if it exists
+        existingEntity.filePath?.let {
+            try {
+                val oldFile = File(it)
+                if (oldFile.exists()) {
+                    oldFile.delete()
+                }
+            } catch (e: Exception) {
+                // Ignore if deletion fails, yt-dlp will just overwrite
+            }
+        }
+
+        try {
+            // 4. Fetch VideoInfo
+            val videoInfoResult = VideoInfoUtil.fetchVideoInfoProgressive(existingEntity.url) { /* no progress */ }
+            val videoInfo = videoInfoResult.getOrThrow() // Let the catch block handle failure
+
+            val formats = videoInfo.formats ?: run {
+                throw Exception("No formats found for video")
+            }
+
+            // 5. Find matching formats based on stored preferences
+            // Remove " (Audio)" from title if it exists, to get base title
+            val titleToUse = existingEntity.title.replace(" (Audio)", "")
+            val sanitizedTitle = sanitizeTitle(titleToUse)
+
+            if (existingEntity.videoFormat == "Audio Only") {
+                // --- AUDIO ONLY REDOWNLOAD ---
+                val targetAudioBitrate = parseQualityFromString(existingEntity.audioFormat)
+                // Try to find the same container, fallback to any
+                val selectedAudio = findNearestAudioFormat(formats, targetAudioBitrate, "m4a")
+                    ?: findNearestAudioFormat(formats, targetAudioBitrate, "webm")
+                    ?: formats.filter { it.acodec != "none" && it.vcodec == "none" }.maxByOrNull { it.abr ?: 0 }
+
+                if (selectedAudio == null) throw Exception("Could not find suitable audio format")
+
+                // Update entity with new file size and exact format info
+                val updatedEntity = queuedEntity.copy(
+                    fileSize = selectedAudio.fileSize ?: 0L,
+                    audioFormat = "${selectedAudio.abr}kbps" // Update in case bitrate changed
+                )
+                repository.updateDownload(updatedEntity)
+
+                // Start executeAudioDownload
+                // NOTE: We don't know if user wanted subtitles. Defaulting to false.
+                // A better fix is to store this preference in DownloadEntity
+                executeAudioDownload(updatedEntity, selectedAudio, sanitizedTitle, selectedAudio.ext ?: "mp3", false, "")
+
+            } else {
+                // --- VIDEO + AUDIO REDOWNLOAD ---
+                val targetVideoHeight = parseQualityFromString(existingEntity.videoFormat)
+                val targetAudioBitrate = parseQualityFromString(existingEntity.audioFormat)
+
+                val selectedVideo = findNearestVideoFormat(formats, targetVideoHeight, "mp4")
+                    ?: findNearestVideoFormat(formats, targetVideoHeight, "webm")
+                    ?: formats.filter { it.vcodec != "none" && it.acodec == "none" }.maxByOrNull { it.height ?: 0 }
+
+                val selectedAudio = findNearestAudioFormat(formats, targetAudioBitrate, "m4a")
+                    ?: findNearestAudioFormat(formats, targetAudioBitrate, "webm")
+                    ?: formats.filter { it.acodec != "none" && it.vcodec == "none" }.maxByOrNull { it.abr ?: 0 }
+
+                if (selectedVideo == null || selectedAudio == null) throw Exception("Could not find suitable video/audio formats")
+
+                // Update entity with new file size and exact format info
+                val newTotalSize = (selectedVideo.fileSize ?: 0L) + (selectedAudio.fileSize ?: 0L)
+                val updatedEntity = queuedEntity.copy(
+                    fileSize = if (newTotalSize > 0) newTotalSize else 0L,
+                    videoFormat = "${selectedVideo.height}p", // Update in case height changed
+                    audioFormat = "${selectedAudio.abr}kbps" // Update in case bitrate changed
+                )
+                repository.updateDownload(updatedEntity)
+
+                // Start executeVideoDownload
+                // NOTE: Defaulting to false for subtitles
+                executeVideoDownload(updatedEntity, selectedVideo, selectedAudio, sanitizedTitle, "mp4", false, "")
+            }
+
+        } catch (e: Exception) {
+            // 6. Handle failure
+            val errorMsg = e.message ?: "Unknown error"
+            showToast("❌ Redownload failed: $errorMsg")
+            repository.updateDownload(
+                queuedEntity.copy(
+                    status = DownloadStatus.FAILED,
+                    error = "Redownload failed: $errorMsg"
+                )
+            )
+        }
+    }
+
     /**
      * Cancels an active download by updating its status in the DB.
      * This matches the original app's logic and does not kill the process.
@@ -332,21 +505,16 @@ class DownloadService(
 
     /**
      * Retries a failed download.
-     * Note: This is a simple retry that re-queues. A full implementation
-     * would need to re-fetch formats or store them in the DownloadEntity.
+     * This now just calls the new redownload function.
      */
     suspend fun retryDownload(downloadId: String) = withContext(Dispatchers.IO) {
         val download = repository.getDownloadById(downloadId)
-        if (download != null && download.status == DownloadStatus.FAILED) {
-            repository.updateDownloadStatus(downloadId, DownloadStatus.QUEUED)
-            showToast("Retrying download: ${download.title}")
-            // In a real app, you would re-launch the appropriate
-            // executeVideoDownload or executeAudioDownload function here.
-            // For this refactor, we just set the status to QUEUED.
-            // You would need to re-trigger the download from the ViewModel
-            // or pass subtitle/format info here.
+        if (download != null && (download.status == DownloadStatus.FAILED || download.status == DownloadStatus.CANCELLED)) {
+            // Use the new redownload logic
+            redownloadVideoItem(downloadId)
         }
     }
+
     suspend fun removeFromApp(downloadId: String) = withContext(Dispatchers.IO) {
         val download = repository.getDownloadById(downloadId)
         repository.deleteDownload(downloadId)
@@ -362,10 +530,21 @@ class DownloadService(
      * Deletes a download from the repository and filesystem.
      */
     suspend fun deleteDownload(downloadId: String) = withContext(Dispatchers.IO) {
-        val title = repository.getDownloadById(downloadId)?.title
+        val download = repository.getDownloadById(downloadId)
+        // Delete file first
+        download?.filePath?.let {
+            try {
+                val oldFile = File(it)
+                if (oldFile.exists()) {
+                    oldFile.delete()
+                }
+            } catch (e: Exception) {
+                showToast("Could not delete file: ${e.message}")
+            }
+        }
+        // Then delete from repository
         repository.deleteDownload(downloadId)
-        // You might also want to delete the file from disk here
-        title?.let { showToast("Download deleted: $it") }
+        download?.title?.let { showToast("Download deleted: $it") }
     }
 
     private fun showToast(message: String) {

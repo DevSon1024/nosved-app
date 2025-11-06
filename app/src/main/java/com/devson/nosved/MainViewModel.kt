@@ -322,36 +322,40 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      */
     fun retryDownload(downloadId: String) {
         viewModelScope.launch {
-            downloadService.retryDownload(downloadId)
+            // This is for retrying FAILED items.
+            // We can reuse the new redownload function for this.
+            showToast("🔄 Queuing retry...")
+            downloadService.redownloadVideoItem(downloadId)
         }
     }
+
+    /**
+     * Handles the "Redownload" click from the UI.
+     * If sameQuality is true, it restarts the download on the *existing* item.
+     * If sameQuality is false, it loads the video info for the user to make a *new* selection.
+     */
     fun redownloadVideo(downloadId: String, sameQuality: Boolean) {
         viewModelScope.launch {
-            val download = downloadService.getDownloadById(downloadId)
-            if (download != null) {
-                if (sameQuality) {
-                    // Use the stored quality preferences to redownload with same quality
-                    showToast("🔄 Redownloading with same quality...")
+            val download = downloadService.getDownloadById(downloadId) // Check if it exists
+            if (download == null) {
+                showToast("❌ Download not found")
+                return@launch
+            }
 
-                    // Fetch video info again and download with same quality
-                    // We don't have subtitle info stored, so we default to false.
-                    fetchVideoInfoForRedownload(
-                        download.url,
-                        download.videoFormat,
-                        download.audioFormat,
-                        download.title,
-                        false, // Defaulting to no subtitles
-                        "en,best"
-                    )
-                } else {
-                    // Set the URL and fetch video info for user to choose quality
-                    _currentUrl.value = download.url
-                    showToast("🔍 Fetching video info for quality selection...")
-                    fetchVideoInfo(download.url)
-                }
+            if (sameQuality) {
+                // NEW: Ask the service to restart the download using the *same ID*
+                // The service will set its status to QUEUED, and the UI will update.
+                showToast("🔄 Queuing redownload...")
+                downloadService.redownloadVideoItem(downloadId)
+            } else {
+                // This flow is for choosing new quality.
+                // It loads the URL into the main screen. The user can then start a *new*
+                // download. They can manually delete the old one. This is acceptable.
+                _currentUrl.value = download.url
+                showToast("🔍 Fetching video info for quality selection...")
+                fetchVideoInfo(download.url)
 
-                // Remove the old entry from database
-                downloadService.removeFromApp(downloadId)
+                // We NO LONGER remove the item from the app here.
             }
         }
     }
@@ -365,52 +369,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    // This function is no longer needed, as DownloadService handles this logic.
+    /*
     private fun fetchVideoInfoForRedownload(
         url: String,
         videoFormat: String?,
         audioFormat: String?,
         title: String,
-        downloadSubtitles: Boolean, // Added
-        subtitleLang: String      // Added
-    ) {
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                VideoInfoUtil.fetchVideoInfoProgressive(url) { progress ->
-                    when (progress.stage) {
-                        "Complete", "Cache hit" -> {
-                            progress.basicInfo?.let { info ->
-                                // Parse the stored format preferences
-                                val videoQuality = videoFormat?.replace("p", "") ?: "720"
-                                val audioQuality = audioFormat?.replace("kbps", "") ?: "128"
-
-                                // Determine download mode based on stored formats
-                                val downloadMode = if (videoFormat == "Audio Only") {
-                                    DownloadMode.AUDIO_ONLY
-                                } else {
-                                    DownloadMode.VIDEO_AUDIO
-                                }
-
-                                // Start download with same quality
-                                downloadVideoWithQuality(
-                                    videoInfo = info,
-                                    customTitle = title,
-                                    downloadMode = downloadMode,
-                                    preferredVideoQuality = "${videoQuality}p",
-                                    preferredAudioQuality = "${audioQuality}kbps",
-                                    downloadSubtitles = downloadSubtitles,
-                                    subtitleLang = subtitleLang
-                                )
-                            }
-                        }
-                    }
-                }.onFailure { exception ->
-                    showToast("❌ Failed to fetch video info for redownload: ${exception.message}")
-                }
-            } catch (e: Exception) {
-                showToast("❌ Redownload failed: ${e.message}")
-            }
-        }
-    }
+        downloadSubtitles: Boolean,
+        subtitleLang: String
+    ) { ... }
+    */
 
     // === END OF REFACTORED FUNCTIONS ===
 
