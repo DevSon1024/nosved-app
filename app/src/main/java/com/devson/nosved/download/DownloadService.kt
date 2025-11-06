@@ -36,6 +36,25 @@ class DownloadService(
     private fun getNotificationId(downloadId: String): Int = abs(downloadId.hashCode())
 
     /**
+     * Helper to parse the yt-dlp output line for the current task.
+     */
+    private fun parseTaskDescription(line: String): String? {
+        return when {
+            line.contains("[Merger]") -> "Merging files..."
+            line.contains("[ExtractAudio]") -> "Extracting audio..."
+            // Check for audio-specific extensions
+            line.contains("[download]") && (line.contains(".m4a") || line.contains(".opus") || line.contains(".mp3")) -> "Downloading audio..."
+            // Check for video-specific extensions
+            line.contains("[download]") && (line.contains(".mp4") || line.contains(".mkv") || line.contains(".webm")) -> "Downloading video..."
+            // Generic download, but often the first step
+            line.contains("[download] Destination:") -> "Initializing download..."
+            // Fallback for any other download progress
+            line.contains("[download]") && line.contains("ETA") -> "Downloading..."
+            else -> null // No relevant update
+        }
+    }
+
+    /**
      * Creates a new DownloadEntity for a video and audio merge,
      * inserts it into the repository, and starts the download execution.
      */
@@ -44,21 +63,24 @@ class DownloadService(
         videoFormat: VideoFormat,
         audioFormat: VideoFormat,
         customTitle: String,
-        downloadSubtitles: Boolean, // Added for subtitles
-        subtitleLang: String      // Added for subtitles
+        downloadSubtitles: Boolean,
+        subtitleLang: String
     ) {
         val downloadId = UUID.randomUUID().toString()
         val totalSize = (videoFormat.fileSize ?: 0L) + (audioFormat.fileSize ?: 0L)
-        // Use the new, less restrictive sanitizeTitle function
         val titleToUse = customTitle.ifBlank { videoInfo.title ?: "Unknown Title" }
-        val sanitizedTitle = sanitizeTitle(titleToUse)
-        val outputExtension = "mp4" // Merged format
+        val sanitizedTitle = sanitizeTitle(titleToUse) // From DownloadUtils.kt
+        val outputExtension = "mp4"
+
+        // Request medium quality (mq) instead of high quality (hq)
+        val thumbnailUrl = videoInfo.thumbnail?.replace("hqdefault.jpg", "mqdefault.jpg")
+            ?: videoInfo.thumbnail
 
         val downloadEntity = DownloadEntity(
             id = downloadId,
             title = titleToUse,
             url = videoInfo.webpageUrl ?: "",
-            thumbnail = videoInfo.thumbnail,
+            thumbnail = thumbnailUrl, // Use compressed thumbnail URL
             filePath = null,
             fileName = null,
             fileSize = if (totalSize > 0) totalSize else 0L,
@@ -67,7 +89,6 @@ class DownloadService(
             uploader = videoInfo.uploader,
             videoFormat = "${videoFormat.height}p",
             audioFormat = "${audioFormat.abr}kbps"
-            // You could also store subtitle info here
         )
 
         repository.insertDownload(downloadEntity)
@@ -93,13 +114,12 @@ class DownloadService(
         audioFormat: VideoFormat,
         sanitizedTitle: String,
         outputExtension: String,
-        downloadSubtitles: Boolean, // Added
-        subtitleLang: String      // Added
+        downloadSubtitles: Boolean,
+        subtitleLang: String
     ) = withContext(Dispatchers.IO) {
         val downloadId = downloadEntity.id
-        val notificationId = getNotificationId(downloadId) // Get unique ID
+        val notificationId = getNotificationId(downloadId)
         try {
-            // Only update to DOWNLOADING if it's not already
             if (repository.getDownloadById(downloadId)?.status != DownloadStatus.DOWNLOADING) {
                 repository.updateDownloadStatus(downloadId, DownloadStatus.DOWNLOADING)
             }
@@ -121,34 +141,36 @@ class DownloadService(
             request.addOption("--retries", "3")
             request.addOption("--fragment-retries", "3")
 
-            // Add Subtitle Options
             if (downloadSubtitles) {
                 request.addOption("--write-subs")
                 request.addOption("--sub-lang", subtitleLang)
-                request.addOption("--embed-subs") // Embed into video file
-                request.addOption("--convert-subs", "srt") // Convert to srt first
+                request.addOption("--embed-subs")
+                request.addOption("--convert-subs", "srt")
             }
 
             YoutubeDL.getInstance().execute(request) { progress, _, line ->
                 coroutineScope.launch(Dispatchers.IO) {
+                    val newDescription = parseTaskDescription(line)
+                    val oldProgress = progressFlow.value[downloadId]
+                    val taskDescription = newDescription ?: oldProgress?.taskDescription ?: "Downloading..."
+
                     val progressData = DownloadProgress(
                         id = downloadId,
                         progress = if (progress > 0) progress.toInt() else 0,
-                        downloadedSize = 0L, // This is hard to get accurately during merge
+                        downloadedSize = 0L,
                         totalSize = downloadEntity.fileSize,
                         speed = extractSpeed(line),
-                        eta = extractETA(line)
+                        eta = extractETA(line),
+                        taskDescription = taskDescription // Set the task description
                     )
                     progressFlow.value = progressFlow.value + (downloadId to progressData)
                     repository.updateDownloadProgress(downloadId, progressData.progress, 0L)
-                    // Use new notification method
                     notificationHelper.showDownloadProgressNotification(notificationId, downloadEntity.title, line)
                 }
             }
 
-            // Check if job was cancelled
             if (repository.getDownloadById(downloadId)?.status == DownloadStatus.CANCELLED) {
-                notificationHelper.cancelNotification(notificationId) // Cancel notification
+                notificationHelper.cancelNotification(notificationId)
                 return@withContext
             }
 
@@ -159,15 +181,18 @@ class DownloadService(
                     fileName = "${sanitizedTitle}.${outputExtension}",
                     completedAt = System.currentTimeMillis(),
                     progress = 100,
-                    error = null // Clear any previous error
+                    error = null
                 )
             )
             showToast("✅ Download completed: ${downloadEntity.title}")
-            // Show complete notification (replaces progress one)
-            notificationHelper.showDownloadCompleteNotification(notificationId, downloadEntity.title, finalFilePath.absolutePath)
+            notificationHelper.showDownloadCompleteNotification(
+                notificationId,
+                downloadEntity.title,
+                finalFilePath.absolutePath,
+                isAudioOnly = false // This is a video download
+            )
 
         } catch (e: Exception) {
-            // Check if status is CANCELLED before reporting a failure
             if (repository.getDownloadById(downloadId)?.status == DownloadStatus.CANCELLED) {
                 showToast("❌ Download cancelled: ${downloadEntity.title}")
             } else {
@@ -179,7 +204,7 @@ class DownloadService(
                     )
                 )
             }
-            notificationHelper.cancelNotification(notificationId) // Cancel on failure/cancel
+            notificationHelper.cancelNotification(notificationId)
         } finally {
             progressFlow.value = progressFlow.value - downloadId
         }
@@ -193,20 +218,23 @@ class DownloadService(
         videoInfo: VideoInfo,
         audioFormat: VideoFormat,
         customTitle: String,
-        downloadSubtitles: Boolean, // Added
-        subtitleLang: String      // Added
+        downloadSubtitles: Boolean,
+        subtitleLang: String
     ) {
         val downloadId = UUID.randomUUID().toString()
         val titleToUse = customTitle.ifBlank { videoInfo.title ?: "Unknown Title" }
-        // Use the new, less restrictive sanitizeTitle function
         val sanitizedTitle = sanitizeTitle(titleToUse)
         val audioExtension = audioFormat.ext ?: "mp3"
+
+        // Request medium quality (mq) instead of high quality (hq)
+        val thumbnailUrl = videoInfo.thumbnail?.replace("hqdefault.jpg", "mqdefault.jpg")
+            ?: videoInfo.thumbnail
 
         val downloadEntity = DownloadEntity(
             id = downloadId,
             title = "${titleToUse} (Audio)",
             url = videoInfo.webpageUrl ?: "",
-            thumbnail = videoInfo.thumbnail,
+            thumbnail = thumbnailUrl, // Use compressed thumbnail URL
             filePath = null,
             fileName = null,
             fileSize = audioFormat.fileSize ?: 0L,
@@ -238,13 +266,12 @@ class DownloadService(
         audioFormat: VideoFormat,
         sanitizedTitle: String,
         audioExtension: String,
-        downloadSubtitles: Boolean, // Added
-        subtitleLang: String      // Added
+        downloadSubtitles: Boolean,
+        subtitleLang: String
     ) = withContext(Dispatchers.IO) {
         val downloadId = downloadEntity.id
-        val notificationId = getNotificationId(downloadId) // Get unique ID
+        val notificationId = getNotificationId(downloadId)
         try {
-            // Only update to DOWNLOADING if it's not already
             if (repository.getDownloadById(downloadId)?.status != DownloadStatus.DOWNLOADING) {
                 repository.updateDownloadStatus(downloadId, DownloadStatus.DOWNLOADING)
             }
@@ -262,33 +289,35 @@ class DownloadService(
             request.addOption("--audio-format", audioExtension)
             request.addOption("--no-warnings")
 
-            // Add Subtitle Options
             if (downloadSubtitles) {
                 request.addOption("--write-subs")
                 request.addOption("--sub-lang", subtitleLang)
                 request.addOption("--convert-subs", "srt")
-                // Don't embed subs in audio, just save as separate file
             }
 
             YoutubeDL.getInstance().execute(request) { progress, _, line ->
                 coroutineScope.launch(Dispatchers.IO) {
+                    val newDescription = parseTaskDescription(line)
+                    val oldProgress = progressFlow.value[downloadId]
+                    val taskDescription = newDescription ?: oldProgress?.taskDescription ?: "Downloading audio..."
+
                     val progressData = DownloadProgress(
                         id = downloadId,
                         progress = if (progress > 0) progress.toInt() else 0,
                         downloadedSize = 0L,
                         totalSize = downloadEntity.fileSize,
                         speed = extractSpeed(line),
-                        eta = extractETA(line)
+                        eta = extractETA(line),
+                        taskDescription = taskDescription // Set the task description
                     )
                     progressFlow.value = progressFlow.value + (downloadId to progressData)
                     repository.updateDownloadProgress(downloadId, progressData.progress, 0L)
-                    // Use new notification method
                     notificationHelper.showDownloadProgressNotification(notificationId, downloadEntity.title, line)
                 }
             }
 
             if (repository.getDownloadById(downloadId)?.status == DownloadStatus.CANCELLED) {
-                notificationHelper.cancelNotification(notificationId) // Cancel notification
+                notificationHelper.cancelNotification(notificationId)
                 return@withContext
             }
 
@@ -299,12 +328,16 @@ class DownloadService(
                     fileName = "${sanitizedTitle}.${audioExtension}",
                     completedAt = System.currentTimeMillis(),
                     progress = 100,
-                    error = null // Clear any previous error
+                    error = null
                 )
             )
             showToast("✅ Audio download completed: ${downloadEntity.title}")
-            // Show complete notification (replaces progress one)
-            notificationHelper.showDownloadCompleteNotification(notificationId, downloadEntity.title, finalFilePath.absolutePath)
+            notificationHelper.showDownloadCompleteNotification(
+                notificationId,
+                downloadEntity.title,
+                finalFilePath.absolutePath,
+                isAudioOnly = true // This is an audio download
+            )
 
         } catch (e: Exception) {
             if (repository.getDownloadById(downloadId)?.status == DownloadStatus.CANCELLED) {
@@ -318,13 +351,13 @@ class DownloadService(
                     )
                 )
             }
-            notificationHelper.cancelNotification(notificationId) // Cancel on failure/cancel
+            notificationHelper.cancelNotification(notificationId)
         } finally {
             progressFlow.value = progressFlow.value - downloadId
         }
     }
 
-    // *** HELPER FUNCTIONS (Copied from MainViewModel) ***
+    // *** HELPER FUNCTIONS (For redownload logic) ***
 
     private fun findNearestAudioFormat(
         formats: List<VideoFormat>,
@@ -383,71 +416,56 @@ class DownloadService(
             return@withContext
         }
 
-        // 1. Show immediate feedback
         showToast("🔄 Re-fetching info for redownload...")
 
-        // 2. Update status to QUEUED immediately
-        // We set filePath to null so it's clear the old file is invalid
         val queuedEntity = existingEntity.copy(
             status = DownloadStatus.QUEUED,
             progress = 0,
             completedAt = null,
             error = null,
-            filePath = null, // Old file path is no longer valid
+            filePath = null,
             fileName = null
         )
         repository.updateDownload(queuedEntity)
 
-        // 3. Delete the old file if it exists
         existingEntity.filePath?.let {
             try {
                 val oldFile = File(it)
                 if (oldFile.exists()) {
                     oldFile.delete()
                 }
-            } catch (e: Exception) {
-                // Ignore if deletion fails, yt-dlp will just overwrite
-            }
+            } catch (e: Exception) { /* Ignore */ }
         }
 
         try {
-            // 4. Fetch VideoInfo
             val videoInfoResult = VideoInfoUtil.fetchVideoInfoProgressive(existingEntity.url) { /* no progress */ }
-            val videoInfo = videoInfoResult.getOrThrow() // Let the catch block handle failure
+            val videoInfo = videoInfoResult.getOrThrow()
 
             val formats = videoInfo.formats ?: run {
                 throw Exception("No formats found for video")
             }
 
-            // 5. Find matching formats based on stored preferences
-            // Remove " (Audio)" from title if it exists, to get base title
             val titleToUse = existingEntity.title.replace(" (Audio)", "")
             val sanitizedTitle = sanitizeTitle(titleToUse)
 
             if (existingEntity.videoFormat == "Audio Only") {
-                // --- AUDIO ONLY REDOWNLOAD ---
                 val targetAudioBitrate = parseQualityFromString(existingEntity.audioFormat)
-                // Try to find the same container, fallback to any
                 val selectedAudio = findNearestAudioFormat(formats, targetAudioBitrate, "m4a")
                     ?: findNearestAudioFormat(formats, targetAudioBitrate, "webm")
                     ?: formats.filter { it.acodec != "none" && it.vcodec == "none" }.maxByOrNull { it.abr ?: 0 }
 
                 if (selectedAudio == null) throw Exception("Could not find suitable audio format")
 
-                // Update entity with new file size and exact format info
                 val updatedEntity = queuedEntity.copy(
                     fileSize = selectedAudio.fileSize ?: 0L,
-                    audioFormat = "${selectedAudio.abr}kbps" // Update in case bitrate changed
+                    audioFormat = "${selectedAudio.abr}kbps"
                 )
                 repository.updateDownload(updatedEntity)
 
-                // Start executeAudioDownload
-                // NOTE: We don't know if user wanted subtitles. Defaulting to false.
-                // A better fix is to store this preference in DownloadEntity
+                // Defaulting to false for subtitles on redownload
                 executeAudioDownload(updatedEntity, selectedAudio, sanitizedTitle, selectedAudio.ext ?: "mp3", false, "")
 
             } else {
-                // --- VIDEO + AUDIO REDOWNLOAD ---
                 val targetVideoHeight = parseQualityFromString(existingEntity.videoFormat)
                 val targetAudioBitrate = parseQualityFromString(existingEntity.audioFormat)
 
@@ -461,22 +479,19 @@ class DownloadService(
 
                 if (selectedVideo == null || selectedAudio == null) throw Exception("Could not find suitable video/audio formats")
 
-                // Update entity with new file size and exact format info
                 val newTotalSize = (selectedVideo.fileSize ?: 0L) + (selectedAudio.fileSize ?: 0L)
                 val updatedEntity = queuedEntity.copy(
                     fileSize = if (newTotalSize > 0) newTotalSize else 0L,
-                    videoFormat = "${selectedVideo.height}p", // Update in case height changed
-                    audioFormat = "${selectedAudio.abr}kbps" // Update in case bitrate changed
+                    videoFormat = "${selectedVideo.height}p",
+                    audioFormat = "${selectedAudio.abr}kbps"
                 )
                 repository.updateDownload(updatedEntity)
 
-                // Start executeVideoDownload
-                // NOTE: Defaulting to false for subtitles
+                // Defaulting to false for subtitles on redownload
                 executeVideoDownload(updatedEntity, selectedVideo, selectedAudio, sanitizedTitle, "mp4", false, "")
             }
 
         } catch (e: Exception) {
-            // 6. Handle failure
             val errorMsg = e.message ?: "Unknown error"
             showToast("❌ Redownload failed: $errorMsg")
             repository.updateDownload(
@@ -490,27 +505,21 @@ class DownloadService(
 
     /**
      * Cancels an active download by updating its status in the DB.
-     * This matches the original app's logic and does not kill the process.
      */
     suspend fun cancelDownload(downloadId: String) = withContext(Dispatchers.IO) {
         val download = repository.getDownloadById(downloadId)
         repository.updateDownloadStatus(downloadId, DownloadStatus.CANCELLED)
-
-        // Also cancel its notification
         notificationHelper.cancelNotification(getNotificationId(downloadId))
-
         progressFlow.value = progressFlow.value - downloadId
         download?.let { showToast("Download cancelled: ${it.title}") }
     }
 
     /**
-     * Retries a failed download.
-     * This now just calls the new redownload function.
+     * Retries a failed or cancelled download.
      */
     suspend fun retryDownload(downloadId: String) = withContext(Dispatchers.IO) {
         val download = repository.getDownloadById(downloadId)
         if (download != null && (download.status == DownloadStatus.FAILED || download.status == DownloadStatus.CANCELLED)) {
-            // Use the new redownload logic
             redownloadVideoItem(downloadId)
         }
     }
@@ -522,15 +531,18 @@ class DownloadService(
             showToast("Removed from app: ${it.title}")
         }
     }
+
     suspend fun getDownloadById(downloadId: String): DownloadEntity? = withContext(Dispatchers.IO) {
         return@withContext repository.getDownloadById(downloadId)
     }
 
     /**
      * Deletes a download from the repository and filesystem.
+     * This version fixes the "Unresolved reference 'title'" error.
      */
     suspend fun deleteDownload(downloadId: String) = withContext(Dispatchers.IO) {
-        val download = repository.getDownloadById(downloadId)
+        val download = repository.getDownloadById(downloadId) // Get the full download object
+
         // Delete file first
         download?.filePath?.let {
             try {
@@ -542,8 +554,12 @@ class DownloadService(
                 showToast("Could not delete file: ${e.message}")
             }
         }
+
         // Then delete from repository
         repository.deleteDownload(downloadId)
+
+        // *** THIS IS THE FIX ***
+        // We use the 'download' variable we already fetched
         download?.title?.let { showToast("Download deleted: $it") }
     }
 

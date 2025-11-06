@@ -11,6 +11,7 @@ import com.devson.nosved.data.*
 import com.devson.nosved.download.DownloadRepository
 import com.devson.nosved.download.DownloadService
 import com.devson.nosved.util.VideoInfoUtil
+import com.devson.nosved.util.YtDlpUpdater
 import com.yausername.youtubedl_android.YoutubeDL
 import com.yausername.youtubedl_android.YoutubeDLException
 import com.yausername.youtubedl_android.mapper.VideoFormat
@@ -25,7 +26,6 @@ import java.net.URI
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val database = DownloadDatabase.getDatabase(application)
-    // 1. Init Repository
     private val downloadRepository = DownloadRepository(database.downloadDao())
     private val context = application.applicationContext
 
@@ -49,7 +49,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val notificationHelper = NotificationHelper(application)
 
-    // 2. Init Service
+    // Init Updater and Settings
+    private val settingsRepository = SettingsRepository(application)
+    private val ytDlpUpdater = YtDlpUpdater(application)
+
     private val downloadService = DownloadService(
         context,
         downloadRepository,
@@ -60,7 +63,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private var currentFetchJob: Job? = null
 
-    // 3. Get flows from repository
     val allDownloads = downloadRepository.allDownloads
     val runningDownloads = downloadRepository.runningDownloads
     val completedDownloads = downloadRepository.completedDownloads
@@ -68,21 +70,40 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         notificationHelper.createNotificationChannel()
-        initializeYoutubeDLLikeSeal()
+
+        // Run update check on init
+        viewModelScope.launch {
+            ytDlpUpdater.checkAndUpdate()
+        }
+
         clearYoutubeDLCache()
     }
+
+    // --- YT-DLP Updater Functions for UI ---
+
+    fun forceUpdateYtDlp() {
+        viewModelScope.launch {
+            showToast("Checking for yt-dlp update...")
+            ytDlpUpdater.checkAndUpdate(force = true)
+        }
+    }
+
+    fun getUpdateInterval(): YtDlpUpdateInterval {
+        return settingsRepository.getUpdateInterval()
+    }
+
+    fun setUpdateInterval(interval: YtDlpUpdateInterval) {
+        settingsRepository.setUpdateInterval(interval)
+        // You might want to update a StateFlow here to update the UI
+    }
+
+    // --- URL and Video Info Functions ---
 
     fun updateUrl(url: String) {
         _currentUrl.value = url
         currentFetchJob?.cancel()
     }
 
-    // Updated to use the more comprehensive URL validation
-    private fun isValidUrl(url: String): Boolean {
-        return isValidUrlComprehensive(url)
-    }
-
-    // This is UI logic, keep it
     fun clearUrl() {
         currentFetchJob?.cancel()
         VideoInfoUtil.cancelFetch(_currentUrl.value)
@@ -92,7 +113,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _selectedAudioFormat.value = null
     }
 
-    // This is info-fetching logic, not download execution. Keep it.
     fun fetchVideoInfo(url: String) {
         currentFetchJob?.cancel()
         VideoInfoUtil.cancelFetch(url)
@@ -138,7 +158,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // This is UI logic, keep it
     private suspend fun setDefaultFormatsOptimized(info: VideoInfo) {
         withContext(Dispatchers.Default) {
             try {
@@ -156,13 +175,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     _selectedAudioFormat.value = bestAudio
                     _selectedVideoFormat.value = bestVideo
                 }
-            } catch (e: Exception) {
-                // Skip
-            }
+            } catch (e: Exception) { /* Skip */ }
         }
     }
 
-    // These are UI state logic, keep them
     fun selectVideoFormat(format: VideoFormat) {
         _selectedVideoFormat.value = format
     }
@@ -171,7 +187,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _selectedAudioFormat.value = format
     }
 
-    // This logic is about *selecting* quality, not executing download. Keep it.
+    // --- Format Finding (for NEW downloads) ---
+
     private fun findNearestAudioFormat(
         formats: List<VideoFormat>,
         preferredBitrate: Int,
@@ -183,13 +200,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     it.abr != null &&
                     it.ext.equals(preferredContainer, ignoreCase = true)
         }
-        // Only equal or lower than requested, sorted descending
         val lowerOrEqual = candidates.filter { (it.abr ?: 0) <= preferredBitrate }
             .sortedByDescending { it.abr }
-
-        // Pick highest available ≤ preferredBitrate, only if available
         if (lowerOrEqual.isNotEmpty()) return lowerOrEqual.first()
-        // If none, pick highest of all candidates in that container
         return candidates.maxByOrNull { it.abr ?: 0 }
     }
 
@@ -219,12 +232,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
 
-    // === 4. REFACTORED DOWNLOAD FUNCTIONS ===
+    // --- Download Control Functions (Delegating to Service) ---
 
-    /**
-     * This function now delegates the actual download to the DownloadService.
-     * Added subtitle parameters.
-     */
     fun downloadVideoWithQuality(
         videoInfo: VideoInfo,
         customTitle: String,
@@ -233,8 +242,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         preferredAudioQuality: String,
         preferredAudioContainer: String = "m4a",
         preferredVideoContainer: String = "mp4",
-        downloadSubtitles: Boolean = false, // Added
-        subtitleLang: String = "en,best"  // Added (e.g., "en" or "en,es" or "best")
+        downloadSubtitles: Boolean = false,
+        subtitleLang: String = "en,best"
     ) {
         viewModelScope.launch (Dispatchers.IO) {
             val formats = videoInfo.formats ?: return@launch
@@ -248,13 +257,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         ?: findNearestAudioFormat(formats, targetAudioBitrate, "webm")
 
                     if (selectedAudio != null) {
-                        // Delegate to service
                         downloadService.startAudioDownload(
-                            videoInfo,
-                            selectedAudio,
-                            customTitle,
-                            downloadSubtitles,
-                            subtitleLang
+                            videoInfo, selectedAudio, customTitle, downloadSubtitles, subtitleLang
                         )
                         _selectedAudioFormat.value = selectedAudio
                         _selectedVideoFormat.value = null
@@ -267,14 +271,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         ?: findNearestAudioFormat(formats, targetAudioBitrate, "webm")
 
                     if (selectedVideo != null && selectedAudio != null) {
-                        // Delegate to service
                         downloadService.startVideoDownload(
-                            videoInfo,
-                            selectedVideo,
-                            selectedAudio,
-                            customTitle,
-                            downloadSubtitles,
-                            subtitleLang
+                            videoInfo, selectedVideo, selectedAudio, customTitle, downloadSubtitles, subtitleLang
                         )
                         _selectedVideoFormat.value = selectedVideo
                         _selectedAudioFormat.value = selectedAudio
@@ -284,27 +282,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /**
-     * Deprecated: This function is replaced by downloadVideoWithQuality and delegates
-     * to DownloadService.startVideoDownload
-     */
+    @Deprecated("Use downloadVideoWithQuality")
     fun downloadVideo(videoInfo: VideoInfo, videoFormat: VideoFormat, audioFormat: VideoFormat, customTitle: String) {
         viewModelScope.launch (Dispatchers.IO) {
-            // Pass default subtitle values (false)
             downloadService.startVideoDownload(
-                videoInfo,
-                videoFormat,
-                audioFormat,
-                customTitle,
-                false,
-                ""
+                videoInfo, videoFormat, audioFormat, customTitle, false, ""
             )
         }
     }
 
-    /**
-     * Delegate cancellation to the DownloadService.
-     */
     fun cancelDownload(downloadId: String) {
         viewModelScope.launch {
             downloadService.cancelDownload(downloadId)
@@ -317,74 +303,40 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /**
-     * Delegate retry to the DownloadService.
-     */
     fun retryDownload(downloadId: String) {
         viewModelScope.launch {
-            // This is for retrying FAILED items.
-            // We can reuse the new redownload function for this.
             showToast("🔄 Queuing retry...")
-            downloadService.redownloadVideoItem(downloadId)
+            downloadService.retryDownload(downloadId) // Service handles logic
         }
     }
 
-    /**
-     * Handles the "Redownload" click from the UI.
-     * If sameQuality is true, it restarts the download on the *existing* item.
-     * If sameQuality is false, it loads the video info for the user to make a *new* selection.
-     */
     fun redownloadVideo(downloadId: String, sameQuality: Boolean) {
         viewModelScope.launch {
-            val download = downloadService.getDownloadById(downloadId) // Check if it exists
+            val download = downloadService.getDownloadById(downloadId)
             if (download == null) {
                 showToast("❌ Download not found")
                 return@launch
             }
 
             if (sameQuality) {
-                // NEW: Ask the service to restart the download using the *same ID*
-                // The service will set its status to QUEUED, and the UI will update.
                 showToast("🔄 Queuing redownload...")
-                downloadService.redownloadVideoItem(downloadId)
+                downloadService.redownloadVideoItem(downloadId) // Service handles logic
             } else {
-                // This flow is for choosing new quality.
-                // It loads the URL into the main screen. The user can then start a *new*
-                // download. They can manually delete the old one. This is acceptable.
                 _currentUrl.value = download.url
                 showToast("🔍 Fetching video info for quality selection...")
                 fetchVideoInfo(download.url)
-
-                // We NO LONGER remove the item from the app here.
             }
         }
     }
 
-    /**
-     * Delegate deletion to the DownloadService.
-     */
     fun deleteDownload(downloadId: String) {
         viewModelScope.launch {
             downloadService.deleteDownload(downloadId)
         }
     }
 
-    // This function is no longer needed, as DownloadService handles this logic.
-    /*
-    private fun fetchVideoInfoForRedownload(
-        url: String,
-        videoFormat: String?,
-        audioFormat: String?,
-        title: String,
-        downloadSubtitles: Boolean,
-        subtitleLang: String
-    ) { ... }
-    */
+    // --- Clipboard & URL Utils ---
 
-    // === END OF REFACTORED FUNCTIONS ===
-
-
-    // These are UI/Clipboard functions, keep them
     fun pasteUrlOnly(): String {
         return try {
             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
@@ -430,33 +382,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // Updated comprehensive URL validation that covers all yt-dlp supported sites
     private fun isValidUrlComprehensive(url: String): Boolean {
-        // First check if it's a valid URL format
         if (!isValidUrlFormat(url)) return false
-
-        // Let yt-dlp handle the validation - it knows best what it can support
-        // We'll do a basic check for common protocols and formats
-        val urlLower = url.lowercase()
-
-        // Support HTTP/HTTPS URLs
+        val urlLower = url.lowercase(Locale.ROOT)
         if (urlLower.startsWith("http://") || urlLower.startsWith("https://")) {
             return true
         }
-
-        // Support some common streaming protocols
         if (urlLower.startsWith("rtmp://") ||
             urlLower.startsWith("rtmps://") ||
             urlLower.startsWith("m3u8://") ||
             urlLower.startsWith("hls://")) {
             return true
         }
-
-        // If it contains a domain with common TLDs, likely valid
         if (containsValidDomain(urlLower)) {
             return true
         }
-
         return false
     }
 
@@ -465,7 +405,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val uri = URI(url)
             uri.scheme != null && uri.host != null
         } catch (e: Exception) {
-            // Try a simpler regex-based validation
             url.matches(Regex("^https?://[\\w\\-.]+(:\\d+)?(/.*)?$", RegexOption.IGNORE_CASE)) ||
                     url.matches(Regex("^[a-zA-Z][a-zA-Z0-9+.-]*://.*", RegexOption.IGNORE_CASE))
         }
@@ -478,7 +417,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             ".ca", ".au", ".in", ".it", ".nl", ".es", ".kr",
             ".tv", ".me", ".io", ".ly", ".be", ".cc", ".to"
         )
-
         return commonTlds.any { tld -> url.contains(tld) }
     }
 
@@ -491,17 +429,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private fun showToast(message: String) {
         viewModelScope.launch(Dispatchers.Main) {
             Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    // These helpers are now in DownloadUtils.kt
-
-    // These are fine to keep
-    private fun initializeYoutubeDLLikeSeal() {
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                YoutubeDL.getInstance().updateYoutubeDL(context)
-            } catch (_: Exception) {}
         }
     }
 

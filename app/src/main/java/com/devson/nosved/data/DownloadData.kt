@@ -35,9 +35,10 @@ enum class DownloadStatus {
 
 data class DownloadProgress(
     val id: String,
-    val progress: Int,
-    val downloadedSize: Long,
-    val totalSize: Long,
+    val progress: Int = 0,
+    val downloadedSize: Long = 0L,
+    val totalSize: Long = 0L,
     val speed: String = "",
-    val eta: String = ""
+    val eta: String = "",
+    val taskDescription: String? = "Initializing..."
 )
