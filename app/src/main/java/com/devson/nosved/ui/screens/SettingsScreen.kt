@@ -160,7 +160,7 @@ fun SettingsScreen(
                 item {
                     SettingsItem(
                         icon = Icons.Default.Code,
-                        title = "Source Code",
+                        title = "Official Repo",
                         subtitle = "View on GitHub",
                         onClick = { openGitHub(context) }
                     )
@@ -171,14 +171,6 @@ fun SettingsScreen(
                         title = "Report Issue",
                         subtitle = "Found a bug? Let us know",
                         onClick = { openIssueTracker(context) }
-                    )
-                }
-                item {
-                    SettingsItem(
-                        icon = Icons.Default.Share,
-                        title = "Share App",
-                        subtitle = "Tell your friends about Nosved",
-                        onClick = { shareApp(context) }
                     )
                 }
             }
@@ -210,8 +202,6 @@ fun SettingsScreen(
         }
     }
 }
-
-// Rest of the existing functions remain the same...
 fun LazyListScope.settingsSection(
     title: String,
     content: LazyListScope.() -> Unit
@@ -387,14 +377,4 @@ fun openGitHub(context: Context) {
 fun openIssueTracker(context: Context) {
     val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/DevSon1024/nosved-app/issues"))
     context.startActivity(intent)
-}
-
-fun shareApp(context: Context) {
-    val shareIntent = Intent().apply {
-        action = Intent.ACTION_SEND
-        type = "text/plain"
-        putExtra(Intent.EXTRA_SUBJECT, "Check out Nosved - Video Downloader")
-        putExtra(Intent.EXTRA_TEXT, "Download videos easily with Nosved! Get it from: https://github.com/DevSon1024/nosved-app")
-    }
-    context.startActivity(Intent.createChooser(shareIntent, "Share Nosved"))
 }
