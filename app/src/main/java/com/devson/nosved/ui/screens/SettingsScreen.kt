@@ -36,7 +36,8 @@ sealed class DialogState {
 fun SettingsScreen(
     onNavigateBack: () -> Unit,
     onNavigateToQualitySettings: () -> Unit,
-    onNavigateToAdvancedSettings: () -> Unit
+    onNavigateToAdvancedSettings: () -> Unit,
+    onNavigateToAppVersion: () -> Unit // New navigation parameter
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -137,14 +138,14 @@ fun SettingsScreen(
                 }
             }
 
-            // About Section
+            // About Section - Updated with App Version navigation
             settingsSection("About") {
                 item {
                     SettingsItem(
                         icon = Icons.Default.Info,
                         title = "App Version",
-                        subtitle = "1.2.0",
-                        onClick = { }
+                        subtitle = "Version info and updates",
+                        onClick = onNavigateToAppVersion // Navigate to new App Version screen
                     )
                 }
                 item {
@@ -201,6 +202,7 @@ fun SettingsScreen(
     }
 }
 
+// Rest of the existing functions remain the same...
 fun LazyListScope.settingsSection(
     title: String,
     content: LazyListScope.() -> Unit
@@ -316,7 +318,7 @@ fun DownloadFolderDialog(
     )
 }
 
-// Helper functions (unchanged)
+// Helper functions remain the same...
 fun showToast(context: Context, msg: String) {
     android.widget.Toast.makeText(context.applicationContext, msg, android.widget.Toast.LENGTH_SHORT).show()
 }

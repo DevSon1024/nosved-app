@@ -75,13 +75,13 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun MainContent(viewModel: MainViewModel) {
+fun MainContent(mainViewModel: MainViewModel) {
     val navController = rememberNavController()
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = currentBackStackEntry?.destination?.route
 
-    val videoInfo by viewModel.videoInfo.collectAsState()
-    val isLoading by viewModel.isLoading.collectAsState()
+    val videoInfo by mainViewModel.videoInfo.collectAsState()
+    val isLoading by mainViewModel.isLoading.collectAsState()
 
     LaunchedEffect(videoInfo, isLoading) {
         if (videoInfo != null && !isLoading) {
@@ -104,8 +104,8 @@ fun MainContent(viewModel: MainViewModel) {
                             }
                         }
                     },
-                    onQuickDownload = { viewModel.pasteFromClipboard() },
-                    viewModel = viewModel
+                    onQuickDownload = { mainViewModel.pasteFromClipboard() },
+                    viewModel = mainViewModel
                 )
             }
         }
@@ -180,7 +180,7 @@ fun MainContent(viewModel: MainViewModel) {
         ) {
             composable("home") {
                 HomeScreen(
-                    viewModel = viewModel,
+                    viewModel = mainViewModel,
                     navController = navController,
                     onNavigateToDownloads = {
                         navController.navigate("downloads") { launchSingleTop = true }
@@ -192,18 +192,27 @@ fun MainContent(viewModel: MainViewModel) {
             }
             composable("video_info") {
                 VideoInfoScreen(
-                    viewModel = viewModel,
+                    viewModel = mainViewModel,
                     onBack = { navController.navigateUp() }
                 )
             }
             composable("downloads") {
-                DownloadsScreen(viewModel)
+                DownloadsScreen(mainViewModel)
             }
+            composable("app_version") {
+                AppVersionScreen(
+                    onNavigateBack = { navController.popBackStack() },
+                    viewModel = mainViewModel // Pass your existing MainViewModel
+                )
+            }
+
+// Update the settings screen composable to include the new navigation
             composable("settings") {
                 SettingsScreen(
-                    onNavigateBack = { navController.navigateUp() },
+                    onNavigateBack = { navController.popBackStack() },
                     onNavigateToQualitySettings = { navController.navigate("quality_settings") },
-                    onNavigateToAdvancedSettings = { navController.navigate("advanced_settings") }
+                    onNavigateToAdvancedSettings = { navController.navigate("advanced_settings") },
+                    onNavigateToAppVersion = { navController.navigate("app_version") } // Add this line
                 )
             }
             composable("quality_settings") {

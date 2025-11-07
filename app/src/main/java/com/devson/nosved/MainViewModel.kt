@@ -21,6 +21,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.io.File
 import java.util.*
+import com.devson.nosved.util.YtDlpUpdateInterval
+
 import java.net.URI
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
