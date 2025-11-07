@@ -206,13 +206,18 @@ fun MainContent(mainViewModel: MainViewModel) {
                 )
             }
 
-// Update the settings screen composable to include the new navigation
             composable("settings") {
                 SettingsScreen(
                     onNavigateBack = { navController.popBackStack() },
                     onNavigateToQualitySettings = { navController.navigate("quality_settings") },
                     onNavigateToAdvancedSettings = { navController.navigate("advanced_settings") },
-                    onNavigateToAppVersion = { navController.navigate("app_version") } // Add this line
+                    onNavigateToAppVersion = { navController.navigate("app_version") },
+                    onNavigateToCredits = { navController.navigate("credits") }
+                )
+            }
+            composable("credits") {
+                CreditsScreen(
+                    onNavigateBack = { navController.popBackStack() }
                 )
             }
             composable("quality_settings") {

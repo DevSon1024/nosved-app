@@ -37,7 +37,8 @@ fun SettingsScreen(
     onNavigateBack: () -> Unit,
     onNavigateToQualitySettings: () -> Unit,
     onNavigateToAdvancedSettings: () -> Unit,
-    onNavigateToAppVersion: () -> Unit // New navigation parameter
+    onNavigateToAppVersion: () -> Unit,
+    onNavigateToCredits: () -> Unit
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -146,6 +147,14 @@ fun SettingsScreen(
                         title = "App Version",
                         subtitle = "Version info and updates",
                         onClick = onNavigateToAppVersion // Navigate to new App Version screen
+                    )
+                }
+                item {
+                    SettingsItem(
+                        icon = Icons.Default.Favorite, // or Icons.Default.Stars
+                        title = "Credits",
+                        subtitle = "Acknowledgements and licenses",
+                        onClick = onNavigateToCredits // Add this new navigation
                     )
                 }
                 item {
