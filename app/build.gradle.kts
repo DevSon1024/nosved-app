@@ -63,6 +63,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            resValue("string", "app_name", "Nosved DL")
             if (keystorePropertiesFile.exists()) {
                 signingConfig = signingConfigs.getByName("release")
             }
@@ -71,6 +72,8 @@ android {
             isMinifyEnabled = false
             isDebuggable = true
             applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+            resValue("string", "app_name", "Nosved Beta")
         }
     }
 
@@ -83,6 +86,15 @@ android {
                 include("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
                 isUniversalApk = false
             }
+        }
+    }
+
+    applicationVariants.all {
+        val variant = this
+        variant.outputs.all {
+            val outputImpl = this as com.android.build.gradle.internal.api.BaseVariantOutputImpl
+            val abiName = outputImpl.filters.find { it.filterType == "ABI" }?.identifier ?: "universal"
+            outputFileName = "Nosved-v${variant.versionName}-${abiName}.apk"
         }
     }
 
@@ -105,7 +117,7 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
-        resValues = false
+        resValues = true
     }
 
     composeOptions {
