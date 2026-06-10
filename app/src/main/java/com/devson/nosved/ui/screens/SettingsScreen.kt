@@ -38,7 +38,8 @@ fun SettingsScreen(
     onNavigateToQualitySettings: () -> Unit,
     onNavigateToAdvancedSettings: () -> Unit,
     onNavigateToAppVersion: () -> Unit,
-    onNavigateToCredits: () -> Unit
+    onNavigateToCredits: () -> Unit,
+    onNavigateToAppearanceSettings: () -> Unit
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -81,6 +82,18 @@ fun SettingsScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
+            // General Section
+            settingsSection("General") {
+                item {
+                    SettingsItem(
+                        icon = Icons.Default.Palette,
+                        title = "Appearance",
+                        subtitle = "Theme mode, colors, and navigation style",
+                        onClick = onNavigateToAppearanceSettings
+                    )
+                }
+            }
+
             // Download Settings Section
             settingsSection("Download Settings") {
                 item {

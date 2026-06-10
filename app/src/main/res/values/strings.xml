@@ -1,3 +1,15 @@
 <resources>
-    <string name="app_name">nosved</string>
+    <string name="app_name">Nosved</string>
+    <string name="settings_display">Appearance</string>
+    <string name="back">Back</string>
+    <string name="appearance_colour_palette">Colour Palette</string>
+    <string name="appearance_theme">Theme Mode</string>
+    <string name="appearance_dark_theme">Dark Theme</string>
+    <string name="appearance_light">Light</string>
+    <string name="appearance_dark">Dark</string>
+    <string name="appearance_system_default">System Default</string>
+    <string name="appearance_dynamic_colour">Dynamic Color</string>
+    <string name="appearance_dynamic_colour_desc">Use colors from system wallpaper</string>
+    <string name="appearance_selected">Selected</string>
+    <string name="appearance_current_palette">Current Palette</string>
 </resources>
