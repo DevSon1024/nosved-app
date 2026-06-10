@@ -1,12 +1,11 @@
-package com.devson.nosved.ui
+package com.devson.nosved.ui.screens
 
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.*
-import androidx.compose.ui.platform.LocalLifecycleOwner
-import com.devson.nosved.MainViewModel
-import com.yausername.youtubedl_android.mapper.VideoInfo
+import com.devson.nosved.ui.common.sheet.FormatSelectionSheet
+import com.devson.nosved.viewmodel.MainViewModel
 import com.yausername.youtubedl_android.mapper.VideoFormat
 
 @OptIn(ExperimentalMaterial3Api::class)

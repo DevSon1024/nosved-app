@@ -13,15 +13,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
-import com.devson.nosved.MainViewModel
+import com.devson.nosved.viewmodel.MainViewModel
 import com.devson.nosved.data.DownloadMode
 import com.devson.nosved.data.QualityPreferences
-import com.devson.nosved.ui.components.QualitySelectionDialog
-import com.devson.nosved.ui.FormatSelectionSheet
+import com.devson.nosved.ui.common.components.QualitySelectionDialog
+import com.devson.nosved.ui.common.sheet.FormatSelectionSheet
 import com.yausername.youtubedl_android.mapper.VideoFormat
 
 @OptIn(ExperimentalMaterial3Api::class)

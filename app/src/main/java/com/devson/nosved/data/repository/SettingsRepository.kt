@@ -1,4 +1,4 @@
-package com.devson.nosved.data
+package com.devson.nosved.data.repository
 
 import android.content.Context
 import android.content.SharedPreferences

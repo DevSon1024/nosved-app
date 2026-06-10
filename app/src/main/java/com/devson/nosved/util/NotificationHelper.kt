@@ -1,4 +1,4 @@
-package com.devson.nosved
+package com.devson.nosved.util
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -9,6 +9,7 @@ import android.net.Uri
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.content.FileProvider
+import com.devson.nosved.R
 import com.devson.nosved.download.MimeTypeUtil
 import java.io.File
 

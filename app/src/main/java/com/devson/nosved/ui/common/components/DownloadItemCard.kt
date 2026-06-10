@@ -1,5 +1,5 @@
 // app/src/main/java/com/devson/nosved/ui/components/DownloadItemCard.kt
-package com.devson.nosved.ui.components
+package com.devson.nosved.ui.common.components
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*

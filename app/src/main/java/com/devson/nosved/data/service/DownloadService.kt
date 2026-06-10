@@ -1,12 +1,17 @@
-package com.devson.nosved.download
+package com.devson.nosved.data.service
 
 import android.content.Context
 import android.os.Environment
-import com.devson.nosved.NotificationHelper
+import android.widget.Toast
+import com.devson.nosved.util.NotificationHelper
 import com.devson.nosved.data.DownloadEntity
 import com.devson.nosved.data.DownloadProgress
 import com.devson.nosved.data.DownloadStatus
+import com.devson.nosved.data.repository.DownloadRepository
 import com.devson.nosved.util.VideoInfoUtil
+import com.devson.nosved.util.extractETA
+import com.devson.nosved.util.extractSpeed
+import com.devson.nosved.util.sanitizeTitle
 import com.yausername.youtubedl_android.YoutubeDL
 import com.yausername.youtubedl_android.YoutubeDLRequest
 import com.yausername.youtubedl_android.mapper.VideoFormat
@@ -17,7 +22,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
-import java.util.*
+import java.util.Locale
+import java.util.UUID
 import kotlin.math.abs
 
 /**
@@ -123,7 +129,8 @@ class DownloadService(
             if (repository.getDownloadById(downloadId)?.status != DownloadStatus.DOWNLOADING) {
                 repository.updateDownloadStatus(downloadId, DownloadStatus.DOWNLOADING)
             }
-            val downloadDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+            val downloadDir =
+                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
             val nosvedDir = File(downloadDir, "nosved")
             if (!nosvedDir.exists()) nosvedDir.mkdirs()
 
@@ -134,7 +141,10 @@ class DownloadService(
             request.addOption("-o", File(nosvedDir, fileName).absolutePath)
             request.addOption("-f", "${videoFormat.formatId}+${audioFormat.formatId}/best")
             request.addOption("--merge-output-format", outputExtension)
-            request.addOption("--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+            request.addOption(
+                "--user-agent",
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+            )
             request.addOption("--referer", "https://www.youtube.com/")
             request.addOption("--no-warnings")
             request.addOption("--socket-timeout", "10")
@@ -152,7 +162,8 @@ class DownloadService(
                 coroutineScope.launch(Dispatchers.IO) {
                     val newDescription = parseTaskDescription(line)
                     val oldProgress = progressFlow.value[downloadId]
-                    val taskDescription = newDescription ?: oldProgress?.taskDescription ?: "Downloading..."
+                    val taskDescription =
+                        newDescription ?: oldProgress?.taskDescription ?: "Downloading..."
 
                     val progressData = DownloadProgress(
                         id = downloadId,
@@ -165,7 +176,11 @@ class DownloadService(
                     )
                     progressFlow.value = progressFlow.value + (downloadId to progressData)
                     repository.updateDownloadProgress(downloadId, progressData.progress, 0L)
-                    notificationHelper.showDownloadProgressNotification(notificationId, downloadEntity.title, line)
+                    notificationHelper.showDownloadProgressNotification(
+                        notificationId,
+                        downloadEntity.title,
+                        line
+                    )
                 }
             }
 
@@ -275,7 +290,8 @@ class DownloadService(
             if (repository.getDownloadById(downloadId)?.status != DownloadStatus.DOWNLOADING) {
                 repository.updateDownloadStatus(downloadId, DownloadStatus.DOWNLOADING)
             }
-            val downloadDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+            val downloadDir =
+                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
             val nosvedDir = File(downloadDir, "nosved")
             if (!nosvedDir.exists()) nosvedDir.mkdirs()
 
@@ -299,7 +315,8 @@ class DownloadService(
                 coroutineScope.launch(Dispatchers.IO) {
                     val newDescription = parseTaskDescription(line)
                     val oldProgress = progressFlow.value[downloadId]
-                    val taskDescription = newDescription ?: oldProgress?.taskDescription ?: "Downloading audio..."
+                    val taskDescription =
+                        newDescription ?: oldProgress?.taskDescription ?: "Downloading audio..."
 
                     val progressData = DownloadProgress(
                         id = downloadId,
@@ -312,7 +329,11 @@ class DownloadService(
                     )
                     progressFlow.value = progressFlow.value + (downloadId to progressData)
                     repository.updateDownloadProgress(downloadId, progressData.progress, 0L)
-                    notificationHelper.showDownloadProgressNotification(notificationId, downloadEntity.title, line)
+                    notificationHelper.showDownloadProgressNotification(
+                        notificationId,
+                        downloadEntity.title,
+                        line
+                    )
                 }
             }
 
@@ -434,11 +455,13 @@ class DownloadService(
                 if (oldFile.exists()) {
                     oldFile.delete()
                 }
-            } catch (e: Exception) { /* Ignore */ }
+            } catch (e: Exception) { /* Ignore */
+            }
         }
 
         try {
-            val videoInfoResult = VideoInfoUtil.fetchVideoInfoProgressive(existingEntity.url) { /* no progress */ }
+            val videoInfoResult =
+                VideoInfoUtil.fetchVideoInfoProgressive(existingEntity.url) { /* no progress */ }
             val videoInfo = videoInfoResult.getOrThrow()
 
             val formats = videoInfo.formats ?: run {
@@ -452,7 +475,8 @@ class DownloadService(
                 val targetAudioBitrate = parseQualityFromString(existingEntity.audioFormat)
                 val selectedAudio = findNearestAudioFormat(formats, targetAudioBitrate, "m4a")
                     ?: findNearestAudioFormat(formats, targetAudioBitrate, "webm")
-                    ?: formats.filter { it.acodec != "none" && it.vcodec == "none" }.maxByOrNull { it.abr ?: 0 }
+                    ?: formats.filter { it.acodec != "none" && it.vcodec == "none" }
+                        .maxByOrNull { it.abr ?: 0 }
 
                 if (selectedAudio == null) throw Exception("Could not find suitable audio format")
 
@@ -463,7 +487,14 @@ class DownloadService(
                 repository.updateDownload(updatedEntity)
 
                 // Defaulting to false for subtitles on redownload
-                executeAudioDownload(updatedEntity, selectedAudio, sanitizedTitle, selectedAudio.ext ?: "mp3", false, "")
+                executeAudioDownload(
+                    updatedEntity,
+                    selectedAudio,
+                    sanitizedTitle,
+                    selectedAudio.ext ?: "mp3",
+                    false,
+                    ""
+                )
 
             } else {
                 val targetVideoHeight = parseQualityFromString(existingEntity.videoFormat)
@@ -471,11 +502,13 @@ class DownloadService(
 
                 val selectedVideo = findNearestVideoFormat(formats, targetVideoHeight, "mp4")
                     ?: findNearestVideoFormat(formats, targetVideoHeight, "webm")
-                    ?: formats.filter { it.vcodec != "none" && it.acodec == "none" }.maxByOrNull { it.height ?: 0 }
+                    ?: formats.filter { it.vcodec != "none" && it.acodec == "none" }
+                        .maxByOrNull { it.height ?: 0 }
 
                 val selectedAudio = findNearestAudioFormat(formats, targetAudioBitrate, "m4a")
                     ?: findNearestAudioFormat(formats, targetAudioBitrate, "webm")
-                    ?: formats.filter { it.acodec != "none" && it.vcodec == "none" }.maxByOrNull { it.abr ?: 0 }
+                    ?: formats.filter { it.acodec != "none" && it.vcodec == "none" }
+                        .maxByOrNull { it.abr ?: 0 }
 
                 if (selectedVideo == null || selectedAudio == null) throw Exception("Could not find suitable video/audio formats")
 
@@ -488,7 +521,15 @@ class DownloadService(
                 repository.updateDownload(updatedEntity)
 
                 // Defaulting to false for subtitles on redownload
-                executeVideoDownload(updatedEntity, selectedVideo, selectedAudio, sanitizedTitle, "mp4", false, "")
+                executeVideoDownload(
+                    updatedEntity,
+                    selectedVideo,
+                    selectedAudio,
+                    sanitizedTitle,
+                    "mp4",
+                    false,
+                    ""
+                )
             }
 
         } catch (e: Exception) {
@@ -565,7 +606,7 @@ class DownloadService(
 
     private fun showToast(message: String) {
         coroutineScope.launch(Dispatchers.Main) {
-            android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
         }
     }
 }

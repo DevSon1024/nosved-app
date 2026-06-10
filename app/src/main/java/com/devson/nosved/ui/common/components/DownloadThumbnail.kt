@@ -1,4 +1,4 @@
-package com.devson.nosved.ui.components
+package com.devson.nosved.ui.common.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -161,7 +162,7 @@ private fun DownloadProgressOverlay(
 
 @Composable
 private fun StatusOverlay(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
     iconColor: Color,
     modifier: Modifier = Modifier,
     backgroundColor: Color = Color.Black.copy(alpha = 0.7f)

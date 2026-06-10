@@ -1,29 +1,36 @@
-package com.devson.nosved
+package com.devson.nosved.viewmodel
 
 import android.app.Application
 import android.content.ClipboardManager
 import android.content.Context
-import android.util.Log
 import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.devson.nosved.data.*
-import com.devson.nosved.download.DownloadRepository
-import com.devson.nosved.download.DownloadService
+import com.devson.nosved.util.NotificationHelper
+import com.devson.nosved.data.DownloadDatabase
+import com.devson.nosved.data.DownloadMode
+import com.devson.nosved.data.DownloadProgress
+import com.devson.nosved.data.repository.SettingsRepository
+import com.devson.nosved.data.repository.DownloadRepository
+import com.devson.nosved.data.service.DownloadService
 import com.devson.nosved.util.VideoInfoUtil
+import com.devson.nosved.util.YtDlpUpdateInterval
 import com.devson.nosved.util.YtDlpUpdater
 import com.yausername.youtubedl_android.YoutubeDL
-import com.yausername.youtubedl_android.YoutubeDLException
 import com.yausername.youtubedl_android.mapper.VideoFormat
 import com.yausername.youtubedl_android.mapper.VideoInfo
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
-import java.util.*
-import com.devson.nosved.util.YtDlpUpdateInterval
-
 import java.net.URI
+import java.util.Locale
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -136,24 +143,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                 launch(Dispatchers.Default) {
                                     setDefaultFormatsOptimized(info)
                                 }
-                                showToast("✅ Video info loaded!")
+                                showToast("Video info loaded!")
                             }
                         }
                     }
                 }.onFailure { exception ->
                     val errorMessage = when {
-                        exception is CancellationException -> "❌ Fetch cancelled"
-                        exception is TimeoutCancellationException -> "⏱️ Request timed out - try again"
-                        exception.message?.contains("network") == true -> "🌐 Network error - check connection"
-                        exception.message?.contains("Invalid") == true -> "❌ Invalid or unsupported URL"
-                        exception.message?.contains("Unsupported URL") == true -> "❌ This site is not supported by yt-dlp"
-                        exception.message?.contains("No video formats found") == true -> "❌ No downloadable video found"
-                        else -> "❌ Failed to get video info: ${exception.message}"
+                        exception is CancellationException -> "Fetch cancelled"
+                        exception is TimeoutCancellationException -> "Request timed out - try again"
+                        exception.message?.contains("network") == true -> " Network error - check connection"
+                        exception.message?.contains("Invalid") == true -> " Invalid or unsupported URL"
+                        exception.message?.contains("Unsupported URL") == true -> " This site is not supported by yt-dlp"
+                        exception.message?.contains("No video formats found") == true -> " No downloadable video found"
+                        else -> " Failed to get video info: ${exception.message}"
                     }
                     showToast(errorMessage)
                 }
             } catch (e: Exception) {
-                showToast("❌ Unexpected error occurred")
+                showToast(" Unexpected error occurred")
             } finally {
                 _isLoading.value = false
             }
@@ -164,12 +171,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         withContext(Dispatchers.Default) {
             try {
                 val formats = info.formats ?: return@withContext
-                val audioJob = async { formats.filter { it.acodec != "none" && it.vcodec == "none" }.maxByOrNull { it.abr ?: 0 } }
+                val audioJob = async {
+                    formats.filter { it.acodec != "none" && it.vcodec == "none" }
+                        .maxByOrNull { it.abr ?: 0 }
+                }
                 val videoJob = async {
                     formats.filter { it.vcodec != "none" && it.acodec == "none" }
                         .sortedByDescending { it.height ?: 0 }
                         .find { (it.height ?: 0) in 480..720 }
-                        ?: formats.filter { it.vcodec != "none" && it.acodec == "none" }.maxByOrNull { it.height ?: 0 }
+                        ?: formats.filter { it.vcodec != "none" && it.acodec == "none" }
+                            .maxByOrNull { it.height ?: 0 }
                 }
                 val bestAudio = audioJob.await()
                 val bestVideo = videoJob.await()
@@ -177,7 +188,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     _selectedAudioFormat.value = bestAudio
                     _selectedVideoFormat.value = bestVideo
                 }
-            } catch (e: Exception) { /* Skip */ }
+            } catch (e: Exception) { /* Skip */
+            }
         }
     }
 
@@ -346,15 +358,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             if (clipData != null && clipData.itemCount > 0) {
                 val pastedText = clipData.getItemAt(0).text?.toString() ?: ""
                 _currentUrl.value = pastedText
-                if (pastedText.isNotBlank()) showToast("📋 URL pasted successfully")
-                else showToast("📋 Clipboard is empty")
+                if (pastedText.isNotBlank()) showToast("URL Pasted Successfully")
+                else showToast("Clipboard is empty")
                 pastedText
             } else {
-                showToast("📋 Clipboard is empty")
+                showToast("Clipboard is empty")
                 ""
             }
         } catch (e: Exception) {
-            showToast("❌ Failed to paste from clipboard")
+            showToast("Failed to paste from clipboard")
             ""
         }
     }

@@ -1,4 +1,4 @@
-package com.devson.nosved
+package com.devson.nosved.util
 
 import com.yausername.youtubedl_android.mapper.VideoFormat
 

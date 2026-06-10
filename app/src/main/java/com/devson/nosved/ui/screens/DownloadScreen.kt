@@ -3,7 +3,6 @@ package com.devson.nosved.ui.screens
 
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -13,10 +12,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
-import com.devson.nosved.MainViewModel
+import com.devson.nosved.viewmodel.MainViewModel
 import com.devson.nosved.data.DownloadEntity
-import com.devson.nosved.data.DownloadStatus
-import com.devson.nosved.ui.components.*
+import com.devson.nosved.ui.common.components.DownloadEmptyState
+import com.devson.nosved.ui.common.components.DownloadHeader
+import com.devson.nosved.ui.common.components.DownloadItemCard
+import com.devson.nosved.ui.common.components.DownloadTabRow
 import com.devson.nosved.ui.model.DownloadAction
 import com.devson.nosved.ui.model.DownloadCounts
 import com.devson.nosved.ui.model.DownloadTabType

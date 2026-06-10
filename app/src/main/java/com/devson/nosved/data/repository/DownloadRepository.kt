@@ -1,4 +1,4 @@
-package com.devson.nosved.download
+package com.devson.nosved.data.repository
 
 import com.devson.nosved.data.DownloadDao
 import com.devson.nosved.data.DownloadEntity
@@ -13,9 +13,12 @@ class DownloadRepository(private val downloadDao: DownloadDao) {
 
     // Flows observed by the ViewModel
     val allDownloads: Flow<List<DownloadEntity>> = downloadDao.getAllDownloads()
-    val runningDownloads: Flow<List<DownloadEntity>> = downloadDao.getDownloadsByStatus(DownloadStatus.DOWNLOADING)
-    val completedDownloads: Flow<List<DownloadEntity>> = downloadDao.getDownloadsByStatus(DownloadStatus.COMPLETED)
-    val failedDownloads: Flow<List<DownloadEntity>> = downloadDao.getDownloadsByStatus(DownloadStatus.FAILED)
+    val runningDownloads: Flow<List<DownloadEntity>> = downloadDao.getDownloadsByStatus(
+        DownloadStatus.DOWNLOADING)
+    val completedDownloads: Flow<List<DownloadEntity>> = downloadDao.getDownloadsByStatus(
+        DownloadStatus.COMPLETED)
+    val failedDownloads: Flow<List<DownloadEntity>> = downloadDao.getDownloadsByStatus(
+        DownloadStatus.FAILED)
 
     suspend fun getDownloadById(id: String): DownloadEntity? {
         return downloadDao.getDownloadById(id)

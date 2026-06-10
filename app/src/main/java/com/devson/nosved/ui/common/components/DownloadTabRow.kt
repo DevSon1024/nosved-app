@@ -1,4 +1,4 @@
-package com.devson.nosved.ui.components
+package com.devson.nosved.ui.common.components
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
