@@ -50,8 +50,10 @@ This document is the absolute source of truth for any AI agent or LLM assisting 
 You must actively maintain the project's changelog. After every completed task, bug fix, or feature addition, you must append an entry to the `update_details.md` file.
 
 **Format and Rules for `update_details.md`:**
+
 - Do NOT rewrite or read the entire file. Simply append the new data at the very end.
 - Use the following format for each entry:
+  - **Date:** (Current date and time)
   - **Issue:** (Brief description of the issue, bug, or feature request)
   - **Type:** (e.g., Error, Bug, UI, Performance, Feature, Architecture)
   - **Solution:** (How it was solved/implemented. Max 10 lines.)

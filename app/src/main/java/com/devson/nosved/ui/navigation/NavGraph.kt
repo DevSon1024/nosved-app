@@ -54,12 +54,13 @@ fun MainContent(mainViewModel: MainViewModel) {
                     viewModel = mainViewModel
                 )
             }
-        }
+        },
+        contentWindowInsets = WindowInsets(0.dp)
     ) { innerPadding ->
         NavHost(
             navController = navController,
             startDestination = Screen.Home.route,
-            modifier = Modifier.padding(innerPadding),
+            modifier = Modifier.padding(bottom = innerPadding.calculateBottomPadding()),
             enterTransition = {
                 when (targetState.destination.route) {
                     Screen.Home.route -> slideInHorizontally(

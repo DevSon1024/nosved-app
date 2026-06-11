@@ -6,16 +6,19 @@ import android.content.Intent
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import com.devson.nosved.viewmodel.MainViewModel
 import com.devson.nosved.data.DownloadEntity
 import com.devson.nosved.ui.common.components.DownloadEmptyState
-import com.devson.nosved.ui.common.components.DownloadHeader
 import com.devson.nosved.ui.common.components.DownloadItemCard
 import com.devson.nosved.ui.common.components.DownloadTabRow
 import com.devson.nosved.ui.model.DownloadAction
@@ -56,32 +59,64 @@ fun DownloadsScreen(viewModel: MainViewModel) {
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        // Header
-        DownloadHeader(
-            onSearchClick = { /* TODO: Implement search */ },
-            onSortClick = { /* TODO: Implement sort */ }
-        )
-
-        // Tab Row
-        DownloadTabRow(
-            selectedTab = selectedTab,
-            onTabSelected = { selectedTab = it },
-            downloadCounts = downloadCounts
-        )
-
-        // Content
-        Box(modifier = Modifier.fillMaxSize()) {
-            if (currentDownloads.isEmpty()) {
-                DownloadEmptyState(tabType = selectedTab)
-            } else {
-                DownloadList(
-                    downloads = currentDownloads,
-                    downloadProgress = downloadProgress,
-                    onAction = { action ->
-                        handleDownloadAction(action, viewModel, context)
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        text = "Downloads",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                },
+                actions = {
+                    IconButton(onClick = { /* TODO: Implement search */ }) {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = "Search downloads"
+                        )
                     }
+                    IconButton(onClick = { /* TODO: Implement sort */ }) {
+                        Icon(
+                            imageVector = Icons.Default.Sort,
+                            contentDescription = "Sort downloads"
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background,
+                    titleContentColor = MaterialTheme.colorScheme.primary,
+                    actionIconContentColor = MaterialTheme.colorScheme.onBackground
                 )
+            )
+        },
+        containerColor = MaterialTheme.colorScheme.background
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+        ) {
+            // Tab Row
+            DownloadTabRow(
+                selectedTab = selectedTab,
+                onTabSelected = { selectedTab = it },
+                downloadCounts = downloadCounts
+            )
+
+            // Content
+            Box(modifier = Modifier.fillMaxSize()) {
+                if (currentDownloads.isEmpty()) {
+                    DownloadEmptyState(tabType = selectedTab)
+                } else {
+                    DownloadList(
+                        downloads = currentDownloads,
+                        downloadProgress = downloadProgress,
+                        onAction = { action ->
+                            handleDownloadAction(action, viewModel, context)
+                        }
+                    )
+                }
             }
         }
     }
