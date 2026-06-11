@@ -1,14 +1,25 @@
-// app/src/main/java/com/devson/nosved/ui/screens/DownloadScreen.kt
 package com.devson.nosved.ui.screens
 
 import android.content.Context
 import android.content.Intent
+import android.widget.Toast
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.SelectAll
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -26,6 +37,33 @@ import com.devson.nosved.ui.model.DownloadAction
 import com.devson.nosved.ui.model.DownloadCounts
 import com.devson.nosved.ui.model.DownloadTabType
 import java.io.File
+import java.net.URI
+
+private fun extractDomain(url: String): String {
+    return try {
+        val uri = URI(url)
+        val host = uri.host?.lowercase() ?: ""
+        val cleanHost = if (host.startsWith("www.")) host.substring(4) else host
+        when {
+            cleanHost.contains("youtube") || cleanHost.contains("youtu.be") -> "YouTube"
+            cleanHost.contains("instagram") -> "Instagram"
+            cleanHost.contains("twitter") || cleanHost.contains("x.com") -> "Twitter / X"
+            cleanHost.contains("tiktok") -> "TikTok"
+            cleanHost.contains("facebook") || cleanHost.contains("fb.com") -> "Facebook"
+            cleanHost.isBlank() -> "Others"
+            else -> {
+                val parts = cleanHost.split(".")
+                if (parts.isNotEmpty()) {
+                    parts[0].replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+                } else {
+                    cleanHost
+                }
+            }
+        }
+    } catch (e: Exception) {
+        "Others"
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -34,6 +72,10 @@ fun DownloadsScreen(
     onBack: () -> Unit
 ) {
     var selectedTab by remember { mutableStateOf(DownloadTabType.ALL) }
+    var selectedDomainFilter by remember { mutableStateOf("All") }
+    var isSearchActive by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+
     val context = LocalContext.current
 
     // Collect download states
@@ -42,6 +84,22 @@ fun DownloadsScreen(
     val completedDownloads by viewModel.completedDownloads.collectAsState(initial = emptyList())
     val failedDownloads by viewModel.failedDownloads.collectAsState(initial = emptyList())
     val downloadProgress by viewModel.downloadProgress.collectAsState()
+
+    // Selection state variables
+    var selectedIds by remember { mutableStateOf(emptySet<String>()) }
+    val isInSelectionMode = selectedIds.isNotEmpty()
+
+    // Bottom sheet state variables
+    var activeBottomSheetDownload by remember { mutableStateOf<DownloadEntity?>(null) }
+
+    // Delete confirmation dialog state variables
+    var showDeleteDialogForIds by remember { mutableStateOf<Set<String>?>(null) }
+    var deleteDialogCheckboxState by remember { mutableStateOf(false) }
+
+    // Physical back click handler
+    BackHandler(enabled = isInSelectionMode) {
+        selectedIds = emptySet()
+    }
 
     // Calculate download counts
     val downloadCounts = remember(allDownloads, runningDownloads, completedDownloads, failedDownloads) {
@@ -53,8 +111,8 @@ fun DownloadsScreen(
         )
     }
 
-    // Get current downloads based on selected tab
-    val currentDownloads = remember(selectedTab, allDownloads, runningDownloads, completedDownloads, failedDownloads) {
+    // Get base downloads based on selected status tab
+    val baseDownloads = remember(selectedTab, allDownloads, runningDownloads, completedDownloads, failedDownloads) {
         when (selectedTab) {
             DownloadTabType.ALL -> allDownloads
             DownloadTabType.ACTIVE -> runningDownloads
@@ -63,70 +121,424 @@ fun DownloadsScreen(
         }
     }
 
+    // Dynamically extract domains list based on downloads
+    val domainsList = remember(allDownloads) {
+        val extracted = allDownloads.map { extractDomain(it.url) }.distinct().filter { it.isNotBlank() }.sorted()
+        listOf("All") + extracted
+    }
+
+    // Ensure selectedDomainFilter is valid if domainsList changes
+    LaunchedEffect(domainsList) {
+        if (!domainsList.contains(selectedDomainFilter)) {
+            selectedDomainFilter = "All"
+        }
+    }
+
+    // Filter base downloads by search query and domain
+    val filteredDownloads = remember(baseDownloads, searchQuery, selectedDomainFilter) {
+        baseDownloads.filter { download ->
+            val matchesSearch = searchQuery.isBlank() || download.title.contains(searchQuery, ignoreCase = true)
+            val matchesDomain = selectedDomainFilter == "All" || extractDomain(download.url) == selectedDomainFilter
+            matchesSearch && matchesDomain
+        }
+    }
+
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = "Downloads",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.SemiBold
+            if (isInSelectionMode) {
+                TopAppBar(
+                    title = {
+                        Text(
+                            text = "${selectedIds.size} selected",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = { selectedIds = emptySet() }) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Cancel selection"
+                            )
+                        }
+                    },
+                    actions = {
+                        val allFilteredIds = filteredDownloads.map { it.id }.toSet()
+                        val isAllSelected = selectedIds.containsAll(allFilteredIds)
+                        IconButton(
+                            onClick = {
+                                selectedIds = if (isAllSelected) {
+                                    selectedIds - allFilteredIds
+                                } else {
+                                    selectedIds + allFilteredIds
+                                }
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.SelectAll,
+                                contentDescription = "Select all"
+                            )
+                        }
+                        IconButton(
+                            onClick = {
+                                deleteDialogCheckboxState = false
+                                showDeleteDialogForIds = selectedIds
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = "Delete selected",
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                        titleContentColor = MaterialTheme.colorScheme.onSurface,
+                        navigationIconContentColor = MaterialTheme.colorScheme.onSurface,
+                        actionIconContentColor = MaterialTheme.colorScheme.onSurface
                     )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowBack,
-                            contentDescription = "Back"
-                        )
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { /* TODO: Implement search */ }) {
-                        Icon(
-                            imageVector = Icons.Default.Search,
-                            contentDescription = "Search downloads"
-                        )
-                    }
-                    IconButton(onClick = { /* TODO: Implement sort */ }) {
-                        Icon(
-                            imageVector = Icons.Default.Sort,
-                            contentDescription = "Sort downloads"
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                    titleContentColor = MaterialTheme.colorScheme.primary,
-                    actionIconContentColor = MaterialTheme.colorScheme.onBackground
                 )
-            )
+            } else {
+                TopAppBar(
+                    title = {
+                        if (isSearchActive) {
+                            TextField(
+                                value = searchQuery,
+                                onValueChange = { searchQuery = it },
+                                placeholder = { Text("Search downloads...") },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = TextFieldDefaults.colors(
+                                    focusedContainerColor = androidx.compose.ui.graphics.Color.Transparent,
+                                    unfocusedContainerColor = androidx.compose.ui.graphics.Color.Transparent,
+                                    disabledContainerColor = androidx.compose.ui.graphics.Color.Transparent,
+                                    focusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
+                                    unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent
+                                ),
+                                singleLine = true,
+                                trailingIcon = {
+                                    if (searchQuery.isNotEmpty()) {
+                                        IconButton(onClick = { searchQuery = "" }) {
+                                            Icon(Icons.Default.Clear, contentDescription = "Clear search")
+                                        }
+                                    }
+                                }
+                            )
+                        } else {
+                            Text(
+                                text = "Downloads",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = {
+                            if (isSearchActive) {
+                                isSearchActive = false
+                                searchQuery = ""
+                            } else {
+                                onBack()
+                            }
+                        }) {
+                            Icon(
+                                imageVector = Icons.Default.ArrowBack,
+                                contentDescription = "Back"
+                            )
+                        }
+                    },
+                    actions = {
+                        if (!isSearchActive) {
+                            IconButton(onClick = { isSearchActive = true }) {
+                                Icon(
+                                    imageVector = Icons.Default.Search,
+                                    contentDescription = "Search downloads"
+                                )
+                            }
+                        }
+                        IconButton(onClick = { /* TODO: Implement sort */ }) {
+                            Icon(
+                                imageVector = Icons.Default.Sort,
+                                contentDescription = "Sort downloads"
+                            )
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.background,
+                        titleContentColor = MaterialTheme.colorScheme.primary,
+                        actionIconContentColor = MaterialTheme.colorScheme.onBackground
+                    )
+                )
+            }
         },
         containerColor = MaterialTheme.colorScheme.background
     ) { paddingValues ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
+                .padding(top = paddingValues.calculateTopPadding())
         ) {
-            // Tab Row
+            // Tab Row (Status filter)
             DownloadTabRow(
                 selectedTab = selectedTab,
                 onTabSelected = { selectedTab = it },
                 downloadCounts = downloadCounts
             )
 
-            // Content
+            // Horizontal Domain filter row (YouTube, Instagram, etc. extracted dynamically)
+            if (domainsList.size > 1) {
+                LazyRow(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(domainsList) { domain ->
+                        FilterChip(
+                            selected = selectedDomainFilter == domain,
+                            onClick = { selectedDomainFilter = domain },
+                            label = { Text(domain) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        )
+                    }
+                }
+            }
+
+            // Content Area with transparent navigation bar support
             Box(modifier = Modifier.fillMaxSize()) {
-                if (currentDownloads.isEmpty()) {
+                if (filteredDownloads.isEmpty()) {
                     DownloadEmptyState(tabType = selectedTab)
                 } else {
                     DownloadList(
-                        downloads = currentDownloads,
+                        downloads = filteredDownloads,
                         downloadProgress = downloadProgress,
+                        selectedIds = selectedIds,
+                        isInSelectionMode = isInSelectionMode,
+                        onToggleSelection = { id ->
+                            selectedIds = if (selectedIds.contains(id)) {
+                                selectedIds - id
+                            } else {
+                                selectedIds + id
+                            }
+                        },
+                        onShowBottomSheet = { download ->
+                            activeBottomSheetDownload = download
+                        },
+                        contentPadding = PaddingValues(
+                            top = 4.dp,
+                            bottom = paddingValues.calculateBottomPadding() + 24.dp
+                        ),
                         onAction = { action ->
                             handleDownloadAction(action, viewModel, context)
                         }
+                    )
+                }
+            }
+        }
+    }
+
+    // Delete Confirmation Dialog
+    showDeleteDialogForIds?.let { idsToDelete ->
+        AlertDialog(
+            onDismissRequest = { showDeleteDialogForIds = null },
+            title = {
+                Text(
+                    text = if (idsToDelete.size > 1) "Remove Downloads" else "Remove Download",
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = if (idsToDelete.size > 1) {
+                            "Are you sure you want to remove the ${idsToDelete.size} selected downloads from your history?"
+                        } else {
+                            "Are you sure you want to remove this download from your history?"
+                        }
+                    )
+                    Row(
+                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { deleteDialogCheckboxState = !deleteDialogCheckboxState }
+                            .padding(vertical = 4.dp)
+                    ) {
+                        Checkbox(
+                            checked = deleteDialogCheckboxState,
+                            onCheckedChange = { deleteDialogCheckboxState = it }
+                        )
+                        Text(
+                            text = "Also delete downloaded files from storage",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val deleteFiles = deleteDialogCheckboxState
+                        
+                        idsToDelete.forEach { id ->
+                            if (deleteFiles) {
+                                viewModel.deleteDownload(id)
+                            } else {
+                                viewModel.removeFromApp(id)
+                            }
+                        }
+                        
+                        selectedIds = selectedIds - idsToDelete
+                        showDeleteDialogForIds = null
+                        activeBottomSheetDownload = null
+                    },
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialogForIds = null }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    // Modern M3 Actions Bottom Sheet
+    activeBottomSheetDownload?.let { download ->
+        ModalBottomSheet(
+            onDismissRequest = { activeBottomSheetDownload = null },
+            sheetState = rememberModalBottomSheetState(),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 24.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        text = download.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 2,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                    )
+                    download.uploader?.let { uploader ->
+                        Text(
+                            text = uploader,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                            val clip = android.content.ClipData.newPlainText("Video Link", download.url)
+                            clipboard.setPrimaryClip(clip)
+                            Toast.makeText(context, "Link copied to clipboard", Toast.LENGTH_SHORT).show()
+                        }
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = download.url,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Icon(
+                            imageVector = Icons.Default.ContentCopy,
+                            contentDescription = "Copy link",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    val isPlayable = download.status == com.devson.nosved.data.DownloadStatus.COMPLETED && !download.filePath.isNullOrEmpty()
+                    if (isPlayable) {
+                        ListItem(
+                            headlineContent = { Text("Play Video") },
+                            leadingContent = { Icon(Icons.Default.PlayArrow, contentDescription = null) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    handleDownloadAction(DownloadAction.Play(download.filePath.orEmpty()), viewModel, context)
+                                    activeBottomSheetDownload = null
+                                }
+                        )
+                        ListItem(
+                            headlineContent = { Text("Share Video File") },
+                            leadingContent = { Icon(Icons.Default.Share, contentDescription = null) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    handleDownloadAction(DownloadAction.Share(download.filePath.orEmpty()), viewModel, context)
+                                    activeBottomSheetDownload = null
+                                }
+                        )
+                    }
+
+                    ListItem(
+                        headlineContent = { Text("Share Video Link") },
+                        leadingContent = { Icon(Icons.Default.Share, contentDescription = null) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                try {
+                                    val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                                        type = "text/plain"
+                                        putExtra(Intent.EXTRA_TEXT, download.url)
+                                    }
+                                    context.startActivity(Intent.createChooser(sendIntent, "Share Link"))
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "Failed to share link", Toast.LENGTH_SHORT).show()
+                                }
+                                activeBottomSheetDownload = null
+                            }
+                    )
+
+                    ListItem(
+                        headlineContent = { Text("Remove from History", color = MaterialTheme.colorScheme.error) },
+                        leadingContent = { 
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.error
+                            ) 
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                deleteDialogCheckboxState = false
+                                showDeleteDialogForIds = setOf(download.id)
+                            }
                     )
                 }
             }
@@ -138,12 +550,17 @@ fun DownloadsScreen(
 private fun DownloadList(
     downloads: List<DownloadEntity>,
     downloadProgress: Map<String, com.devson.nosved.data.DownloadProgress>,
+    selectedIds: Set<String>,
+    isInSelectionMode: Boolean,
+    onToggleSelection: (String) -> Unit,
+    onShowBottomSheet: (DownloadEntity) -> Unit,
+    contentPadding: PaddingValues,
     onAction: (DownloadAction) -> Unit,
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
         modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp),
+        contentPadding = contentPadding,
         verticalArrangement = Arrangement.spacedBy(1.dp)
     ) {
         items(
@@ -153,7 +570,11 @@ private fun DownloadList(
             DownloadItemCard(
                 download = download,
                 progress = downloadProgress[download.id],
-                onAction = onAction
+                onAction = onAction,
+                isSelected = selectedIds.contains(download.id),
+                isInSelectionMode = isInSelectionMode,
+                onToggleSelection = { onToggleSelection(download.id) },
+                onShowBottomSheet = { onShowBottomSheet(download) }
             )
         }
     }
@@ -175,7 +596,6 @@ private fun handleDownloadAction(
     }
 }
 
-// Video playback and sharing utilities
 private fun playVideo(context: Context, filePath: String) {
     try {
         val file = File(filePath)
@@ -194,7 +614,6 @@ private fun playVideo(context: Context, filePath: String) {
             context.startActivity(Intent.createChooser(intent, "Play Video"))
         }
     } catch (e: Exception) {
-        // Handle error - consider showing a toast or snackbar
         e.printStackTrace()
     }
 }
@@ -218,7 +637,6 @@ private fun shareVideo(context: Context, filePath: String) {
             context.startActivity(Intent.createChooser(intent, "Share Video"))
         }
     } catch (e: Exception) {
-        // Handle error - consider showing a toast or snackbar
         e.printStackTrace()
     }
 }

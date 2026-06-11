@@ -36,7 +36,6 @@ fun DownloadHeader(
                     style = MaterialTheme.typography.headlineSmall.copy(
                         fontWeight = FontWeight.Bold
                     ),
-                    color = MaterialTheme.colorScheme.primary
                 )
                 Text(
                     text = "Manage your downloaded content",

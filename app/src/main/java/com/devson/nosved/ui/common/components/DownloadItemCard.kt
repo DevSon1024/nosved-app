@@ -1,48 +1,91 @@
-// app/src/main/java/com/devson/nosved/ui/components/DownloadItemCard.kt
 package com.devson.nosved.ui.common.components
 
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.devson.nosved.data.DownloadEntity
 import com.devson.nosved.data.DownloadProgress
 import com.devson.nosved.data.DownloadStatus
 import com.devson.nosved.ui.model.DownloadAction
 import java.io.File
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun DownloadItemCard(
     download: DownloadEntity,
     progress: DownloadProgress?,
     onAction: (DownloadAction) -> Unit,
+    isSelected: Boolean,
+    isInSelectionMode: Boolean,
+    onToggleSelection: () -> Unit,
+    onShowBottomSheet: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var showFileNotFoundDialog by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    var showOptionsDialog by remember { mutableStateOf(false) }
+    var dialogTitle by remember { mutableStateOf("") }
+    var dialogMessage by remember { mutableStateOf("") }
+
+    val isPlayable = download.status == DownloadStatus.COMPLETED && !download.filePath.isNullOrEmpty()
+    val isFailedOrCancelled = download.status == DownloadStatus.FAILED || download.status == DownloadStatus.CANCELLED
 
     Card(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp)
             .clip(RoundedCornerShape(16.dp))
-            .clickable {
-                if (download.status == DownloadStatus.COMPLETED && !download.filePath.isNullOrEmpty()) {
-                    val file = File(download.filePath!!)
-                    if (file.exists()) {
-                        onAction(DownloadAction.Play(download.filePath!!))
+            .combinedClickable(
+                onClick = {
+                    if (isInSelectionMode) {
+                        onToggleSelection()
                     } else {
-                        showFileNotFoundDialog = true
+                        if (isPlayable) {
+                            val file = File(download.filePath!!)
+                            if (file.exists()) {
+                                onAction(DownloadAction.Play(download.filePath!!))
+                            } else {
+                                dialogTitle = "File Not Found"
+                                dialogMessage = "The downloaded file has been deleted or moved from your device storage."
+                                showOptionsDialog = true
+                            }
+                        } else if (isFailedOrCancelled) {
+                            dialogTitle = if (download.status == DownloadStatus.FAILED) "Download Failed" else "Download Cancelled"
+                            dialogMessage = if (download.status == DownloadStatus.FAILED) {
+                                "The download failed due to an error:\n${download.error ?: "Unknown error"}"
+                            } else {
+                                "The download was cancelled before completion."
+                            }
+                            showOptionsDialog = true
+                        }
                     }
+                },
+                onLongClick = {
+                    onToggleSelection()
                 }
-            },
+            ),
         elevation = CardDefaults.cardElevation(
             defaultElevation = 2.dp,
             pressedElevation = 4.dp
@@ -53,33 +96,124 @@ fun DownloadItemCard(
         )
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
-            // Thumbnail section
-            DownloadThumbnail(
-                thumbnail = download.thumbnail,
-                duration = download.duration,
-                status = download.status,
-                progress = (progress?.progress ?: download.progress).toFloat(),
-                onThumbnailClick = {
-                    if (!download.filePath.isNullOrEmpty()) {
-                        val file = File(download.filePath!!)
-                        if (file.exists()) {
-                            onAction(DownloadAction.Play(download.filePath!!))
-                        } else {
-                            showFileNotFoundDialog = true
-                        }
+            // Thumbnail container with status badge overlay
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(16f / 9f)
+            ) {
+                // Optimized thumbnail with caching
+                AsyncImage(
+                    model = ImageRequest.Builder(context)
+                        .data(download.thumbnail)
+                        .memoryCacheKey(download.thumbnail)
+                        .diskCacheKey(download.thumbnail)
+                        .crossfade(300)
+                        .build(),
+                    contentDescription = "Video Thumbnail",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+
+                // Gradient overlay for better text visibility
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(60.dp)
+                        .align(Alignment.BottomStart)
+                        .background(
+                            brush = Brush.verticalGradient(
+                                colors = listOf(
+                                    Color.Transparent,
+                                    Color.Black.copy(alpha = 0.7f)
+                                )
+                            )
+                        )
+                )
+
+                // Duration badge
+                download.duration?.let {
+                    Surface(
+                        modifier = Modifier
+                            .padding(8.dp)
+                            .align(Alignment.BottomEnd),
+                        color = Color.Black.copy(alpha = 0.8f),
+                        shape = RoundedCornerShape(4.dp)
+                    ) {
+                        Text(
+                            text = formatDuration(it),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
                     }
                 }
-            )
 
-            // Content section with improved spacing
+                // Status and progress overlays
+                val computedProgress = (progress?.progress ?: download.progress).toFloat()
+                when (download.status) {
+                    DownloadStatus.DOWNLOADING -> {
+                        DownloadProgressOverlay(
+                            progress = computedProgress,
+                            modifier = Modifier.align(Alignment.Center)
+                        )
+
+                        // Progress bar at bottom
+                        LinearProgressIndicator(
+                            progress = { computedProgress / 100f },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(3.dp)
+                                .align(Alignment.BottomStart),
+                            color = MaterialTheme.colorScheme.primary,
+                            trackColor = Color.White.copy(alpha = 0.3f)
+                        )
+                    }
+
+                    DownloadStatus.FAILED -> {
+                        StatusOverlay(
+                            icon = Icons.Default.Error,
+                            iconColor = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.align(Alignment.Center)
+                        )
+                    }
+
+                    else -> {}
+                }
+
+                // Status Badge Overlay on Top-Left
+                StatusBadge(
+                    status = download.status,
+                    modifier = Modifier
+                        .padding(8.dp)
+                        .align(Alignment.TopStart)
+                )
+
+                // Checkbox Overlay on Top-Right in Selection Mode
+                if (isInSelectionMode) {
+                    Checkbox(
+                        checked = isSelected,
+                        onCheckedChange = { onToggleSelection() },
+                        modifier = Modifier
+                            .padding(8.dp)
+                            .align(Alignment.TopEnd),
+                        colors = CheckboxDefaults.colors(
+                            checkedColor = MaterialTheme.colorScheme.primary,
+                            uncheckedColor = Color.White.copy(alpha = 0.8f),
+                            checkmarkColor = MaterialTheme.colorScheme.onPrimary
+                        )
+                    )
+                }
+            }
+
+            // Content section with 3-dots aligned to top-right
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.Top
             ) {
-                // Main content
                 DownloadItemContent(
                     download = download,
                     progress = progress,
@@ -88,38 +222,108 @@ fun DownloadItemCard(
 
                 Spacer(modifier = Modifier.width(12.dp))
 
-                // Actions menu
-                DownloadActions(
-                    download = download,
-                    onAction = onAction
-                )
+                if (!isInSelectionMode) {
+                    IconButton(
+                        onClick = onShowBottomSheet,
+                        modifier = Modifier
+                            .align(Alignment.Top)
+                            .size(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.MoreVert,
+                            contentDescription = "Download options",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                } else {
+                    Spacer(modifier = Modifier.size(32.dp))
+                }
             }
         }
     }
 
-    // Modern file not found dialog
-    if (showFileNotFoundDialog) {
-        FileNotFoundDialog(
+    if (showOptionsDialog) {
+        DownloadActionDialog(
+            title = dialogTitle,
+            message = dialogMessage,
             downloadTitle = download.title,
-            onDismiss = { showFileNotFoundDialog = false },
+            onDismiss = { showOptionsDialog = false },
             onDelete = {
                 onAction(DownloadAction.RemoveFromApp(download.id))
-                showFileNotFoundDialog = false
+                showOptionsDialog = false
             },
             onRedownloadSame = {
                 onAction(DownloadAction.Redownload(download.id, sameQuality = true))
-                showFileNotFoundDialog = false
+                showOptionsDialog = false
             },
             onRedownloadDifferent = {
                 onAction(DownloadAction.Redownload(download.id, sameQuality = false))
-                showFileNotFoundDialog = false
+                showOptionsDialog = false
             }
         )
     }
 }
 
 @Composable
-private fun FileNotFoundDialog(
+private fun StatusBadge(
+    status: DownloadStatus,
+    modifier: Modifier = Modifier
+) {
+    val (backgroundColor, textColor, label) = when (status) {
+        DownloadStatus.COMPLETED -> Triple(
+            Color(0xFF2E7D32), // Green
+            Color.White,
+            "Completed"
+        )
+        DownloadStatus.FAILED -> Triple(
+            Color(0xFFC62828), // Red
+            Color.White,
+            "Failed"
+        )
+        DownloadStatus.CANCELLED -> Triple(
+            Color(0xFFC62828), // Dark Gray
+            Color.White,
+            "Cancelled"
+        )
+        DownloadStatus.DOWNLOADING -> Triple(
+            MaterialTheme.colorScheme.primary,
+            MaterialTheme.colorScheme.onPrimary,
+            "Downloading"
+        )
+        DownloadStatus.QUEUED -> Triple(
+            Color(0xFF1565C0), // Blue
+            Color.White,
+            "Queued"
+        )
+        DownloadStatus.PAUSED -> Triple(
+            Color(0xFFEF6C00), // Orange
+            Color.White,
+            "Paused"
+        )
+    }
+
+    Surface(
+        modifier = modifier,
+        color = backgroundColor.copy(alpha = 0.85f),
+        shape = RoundedCornerShape(4.dp)
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall.copy(
+                fontSize = 8.sp,
+                fontWeight = FontWeight.Bold
+            ),
+            color = textColor,
+            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+            maxLines = 1
+        )
+    }
+}
+
+@Composable
+private fun DownloadActionDialog(
+    title: String,
+    message: String,
     downloadTitle: String,
     onDismiss: () -> Unit,
     onDelete: () -> Unit,
@@ -138,7 +342,7 @@ private fun FileNotFoundDialog(
         },
         title = {
             Text(
-                text = "File Not Found",
+                text = title,
                 style = MaterialTheme.typography.headlineSmall,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth()
@@ -150,19 +354,15 @@ private fun FileNotFoundDialog(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(
-                    text = "The downloaded file for:",
+                    text = message,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
                     text = "\"$downloadTitle\"",
                     style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = "has been deleted from your device storage.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.Bold
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
@@ -177,7 +377,6 @@ private fun FileNotFoundDialog(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Primary action - Redownload with same quality
                 Button(
                     onClick = onRedownloadSame,
                     modifier = Modifier.fillMaxWidth(),
@@ -189,7 +388,6 @@ private fun FileNotFoundDialog(
                     )
                 }
 
-                // Secondary action - Redownload with different quality
                 OutlinedButton(
                     onClick = onRedownloadDifferent,
                     modifier = Modifier.fillMaxWidth(),
@@ -201,7 +399,6 @@ private fun FileNotFoundDialog(
                     )
                 }
 
-                // Tertiary action - Remove from app
                 TextButton(
                     onClick = onDelete,
                     modifier = Modifier.fillMaxWidth(),
@@ -221,4 +418,67 @@ private fun FileNotFoundDialog(
         containerColor = MaterialTheme.colorScheme.surface,
         tonalElevation = 6.dp
     )
+}
+
+@Composable
+private fun DownloadProgressOverlay(
+    progress: Float,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .size(64.dp)
+            .background(Color.Black.copy(alpha = 0.7f), CircleShape),
+        contentAlignment = Alignment.Center
+    ) {
+        CircularProgressIndicator(
+            progress = { progress / 100f },
+            modifier = Modifier.size(44.dp),
+            color = Color.White,
+            strokeWidth = 3.dp,
+            trackColor = Color.White.copy(alpha = 0.3f)
+        )
+
+        Text(
+            text = "${progress.toInt()}%",
+            style = MaterialTheme.typography.labelSmall,
+            color = Color.White
+        )
+    }
+}
+
+@Composable
+private fun StatusOverlay(
+    icon: ImageVector,
+    iconColor: Color,
+    modifier: Modifier = Modifier,
+    backgroundColor: Color = Color.Black.copy(alpha = 0.7f)
+) {
+    Box(
+        modifier = modifier
+            .size(56.dp)
+            .background(backgroundColor, CircleShape),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = iconColor,
+            modifier = Modifier.size(24.dp)
+        )
+    }
+}
+
+private fun formatDuration(durationString: String?): String {
+    val duration = durationString?.toIntOrNull()
+    if (duration == null) return "Unknown"
+
+    val hours = duration / 3600
+    val minutes = (duration % 3600) / 60
+    val seconds = duration % 60
+
+    return when {
+        hours > 0 -> String.format("%d:%02d:%02d", hours, minutes, seconds)
+        else -> String.format("%d:%02d", minutes, seconds)
+    }
 }

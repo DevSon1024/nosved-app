@@ -17,8 +17,9 @@ class DownloadRepository(private val downloadDao: DownloadDao) {
         DownloadStatus.DOWNLOADING)
     val completedDownloads: Flow<List<DownloadEntity>> = downloadDao.getDownloadsByStatus(
         DownloadStatus.COMPLETED)
-    val failedDownloads: Flow<List<DownloadEntity>> = downloadDao.getDownloadsByStatus(
-        DownloadStatus.FAILED)
+    val failedDownloads: Flow<List<DownloadEntity>> = downloadDao.getDownloadsByStatuses(
+        listOf(DownloadStatus.FAILED, DownloadStatus.CANCELLED)
+    )
 
     suspend fun getDownloadById(id: String): DownloadEntity? {
         return downloadDao.getDownloadById(id)
