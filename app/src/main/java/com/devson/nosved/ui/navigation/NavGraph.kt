@@ -11,9 +11,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.navigation.NavHostController
 import androidx.navigation.compose.*
 import com.devson.nosved.ui.screens.*
+import com.devson.nosved.ui.screens.settings.AdvancedSettingsScreen
+import com.devson.nosved.ui.screens.settings.AppVersionScreen
+import com.devson.nosved.ui.screens.settings.AppearanceSettingsScreen
+import com.devson.nosved.ui.screens.settings.CreditsScreen
+import com.devson.nosved.ui.screens.settings.QualitySettingsScreen
 import com.devson.nosved.viewmodel.MainViewModel
 
 @Composable

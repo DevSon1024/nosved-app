@@ -1,4 +1,4 @@
-package com.devson.nosved.ui.screens
+package com.devson.nosved.ui.screens.settings
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically

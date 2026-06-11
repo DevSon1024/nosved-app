@@ -1,7 +1,9 @@
-package com.devson.nosved.ui.screens
+package com.devson.nosved.ui.screens.settings
 
+import android.app.Application
 import android.content.Context
 import android.content.pm.PackageManager
+import android.widget.Toast
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -21,6 +23,7 @@ import com.devson.nosved.viewmodel.MainViewModel
 import com.devson.nosved.util.YtDlpUpdater
 import com.yausername.youtubedl_android.YoutubeDL
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -39,7 +42,7 @@ fun AppVersionScreen(
     var isUpdatingYtdlp by remember { mutableStateOf(false) }
 
     // Create YtDlpUpdater instance
-    val ytdlpUpdater = remember { YtDlpUpdater(context.applicationContext as android.app.Application) }
+    val ytdlpUpdater = remember { YtDlpUpdater(context.applicationContext as Application) }
 
     // Function to load version info
     fun loadVersionInfo() {
@@ -132,7 +135,7 @@ fun AppVersionScreen(
                                     }
 
                                     // Wait a moment for update to complete
-                                    kotlinx.coroutines.delay(1500)
+                                    delay(1500)
 
                                     // Reload version info
                                     loadVersionInfo()
@@ -310,5 +313,5 @@ private fun getAppVersion(context: Context): String {
 }
 
 private fun showToastAppVersion(context: Context, message: String) {
-    android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_LONG).show()
+    Toast.makeText(context, message, Toast.LENGTH_LONG).show()
 }
