@@ -140,8 +140,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 VideoInfoUtil.fetchVideoInfoProgressive(url) { progress ->
                     when (progress.stage) {
-                        "Validating URL" -> showToast("🔍 Validating URL...")
-                        "Extracting info" -> showToast("⚡ Extracting video info...")
+                        "Validating URL" -> showToast("Validating URL...")
+                        "Extracting info" -> showToast("Extracting video info...")
                         "Complete", "Cache hit" -> {
                             progress.basicInfo?.let { info ->
                                 val shouldConfigure = settingsRepository.configureBeforeDownloadFlow.value
@@ -308,7 +308,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         )
                         _selectedAudioFormat.value = selectedAudio
                         _selectedVideoFormat.value = null
-                    } else showToast("❌ No suitable audio format found.")
+                    } else showToast("No suitable audio format found.")
                 }
                 DownloadMode.VIDEO_AUDIO -> {
                     val selectedVideo = findNearestVideoFormat(formats, targetVideoHeight, preferredVideoContainer)
@@ -322,7 +322,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         )
                         _selectedVideoFormat.value = selectedVideo
                         _selectedAudioFormat.value = selectedAudio
-                    } else showToast("❌ No suitable video/audio format found.")
+                    } else showToast("No suitable video/audio format found.")
                 }
             }
         }
@@ -351,7 +351,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun retryDownload(downloadId: String) {
         viewModelScope.launch {
-            showToast("🔄 Queuing retry...")
+            showToast("Queuing retry...")
             downloadService.retryDownload(downloadId) // Service handles logic
         }
     }
@@ -360,16 +360,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val download = downloadService.getDownloadById(downloadId)
             if (download == null) {
-                showToast("❌ Download not found")
+                showToast("Download not found")
                 return@launch
             }
 
             if (sameQuality) {
-                showToast("🔄 Queuing redownload...")
+                showToast("Queuing redownload...")
                 downloadService.redownloadVideoItem(downloadId) // Service handles logic
             } else {
                 _currentUrl.value = download.url
-                showToast("🔍 Fetching video info for quality selection...")
+                showToast("Fetching video info for quality selection...")
                 fetchVideoInfo(download.url)
             }
         }
@@ -411,19 +411,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val pastedText = clipData.getItemAt(0).text?.toString() ?: ""
                 _currentUrl.value = pastedText
                 if (pastedText.isNotBlank() && isValidUrlComprehensive(pastedText)) {
-                    showToast("🔗 URL pasted - fetching info...")
+                    showToast("URL pasted")
                     fetchVideoInfo(pastedText)
                 } else if (pastedText.isNotBlank()) {
-                    showToast("⚠️ URL format may not be supported - trying anyway...")
+                    showToast("URL format may not be supported - trying anyway...")
                     fetchVideoInfo(pastedText)
                 }
                 pastedText
             } else {
-                showToast("📋 Clipboard is empty")
+                showToast("Clipboard is empty")
                 ""
             }
         } catch (e: Exception) {
-            showToast("❌ Failed to paste from clipboard")
+            showToast("Failed to paste from clipboard")
             ""
         }
     }

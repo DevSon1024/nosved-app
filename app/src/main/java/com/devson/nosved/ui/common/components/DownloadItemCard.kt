@@ -10,6 +10,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.devson.nosved.data.DownloadEntity
@@ -31,6 +32,7 @@ fun DownloadItemCard(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp)
+            .clip(RoundedCornerShape(16.dp))
             .clickable {
                 if (download.status == DownloadStatus.COMPLETED && !download.filePath.isNullOrEmpty()) {
                     val file = File(download.filePath!!)

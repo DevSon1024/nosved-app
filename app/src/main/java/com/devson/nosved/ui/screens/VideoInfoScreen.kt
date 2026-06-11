@@ -22,6 +22,7 @@ import com.devson.nosved.data.QualityPreferences
 import com.devson.nosved.ui.common.components.QualitySelectionDialog
 import com.devson.nosved.ui.common.sheet.FormatSelectionSheet
 import com.yausername.youtubedl_android.mapper.VideoFormat
+import androidx.compose.ui.text.style.TextOverflow
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -46,7 +47,10 @@ fun VideoInfoScreen(
     var customTitle by remember(videoInfo) { mutableStateOf(videoInfo?.title ?: "") }
     var isEditingTitle by remember { mutableStateOf(false) }
 
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val sheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true,
+        confirmValueChange = { it != SheetValue.Hidden }
+    )
 
     // Collect quality preferences
     val defaultVideoQuality by qualityPrefs.videoQuality.collectAsState(initial = "720p")
@@ -302,43 +306,82 @@ fun VideoInfoScreen(
 
                             Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
 
-                            // Video Stats
+                            // Video Stats (Redesigned with Material You badges/chips)
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Column {
-                                    Text(
-                                        text = "Upload By: ${info.uploader ?: "Unknown"}",
-                                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
-                                        fontWeight = FontWeight.Medium,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
+                                val uploaderText = info.uploader ?: "Unknown"
+                                AssistChip(
+                                    onClick = {},
+                                    label = { 
+                                        Text(
+                                            text = uploaderText,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        ) 
+                                    },
+                                    leadingIcon = { 
+                                        Icon(
+                                            imageVector = Icons.Default.Person,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp),
+                                            tint = MaterialTheme.colorScheme.primary
+                                        ) 
+                                    },
+                                    colors = AssistChipDefaults.assistChipColors(
+                                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                                        labelColor = MaterialTheme.colorScheme.onSurface
+                                    ),
+                                    modifier = Modifier.weight(1f)
+                                )
 
-                                    Text(
-                                        text = "Duration: ${formatDuration(info.duration)}",
-                                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                AssistChip(
+                                    onClick = {},
+                                    label = { 
+                                        Text(
+                                            text = formatDuration(info.duration),
+                                            style = MaterialTheme.typography.bodySmall
+                                        ) 
+                                    },
+                                    leadingIcon = { 
+                                        Icon(
+                                            imageVector = Icons.Default.Schedule,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp),
+                                            tint = MaterialTheme.colorScheme.primary
+                                        ) 
+                                    },
+                                    colors = AssistChipDefaults.assistChipColors(
+                                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                                        labelColor = MaterialTheme.colorScheme.onSurface
                                     )
-                                }
+                                )
 
                                 info.viewCount?.let { views ->
-                                    Column(
-                                        horizontalAlignment = Alignment.End
-                                    ) {
-                                        Text(
-                                            text = "Views",
-                                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    AssistChip(
+                                        onClick = {},
+                                        label = { 
+                                            Text(
+                                                text = formatViewCount(views),
+                                                style = MaterialTheme.typography.bodySmall
+                                            ) 
+                                        },
+                                        leadingIcon = { 
+                                            Icon(
+                                                imageVector = Icons.Default.Visibility,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(16.dp),
+                                                tint = MaterialTheme.colorScheme.primary
+                                            ) 
+                                        },
+                                        colors = AssistChipDefaults.assistChipColors(
+                                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                                            labelColor = MaterialTheme.colorScheme.onSurface
                                         )
-                                        Text(
-                                            text = formatViewCount(views),
-                                            style = MaterialTheme.typography.titleMedium.copy(fontSize = 16.sp),
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.primary
-                                        )
-                                    }
+                                    )
                                 }
                             }
                         }
@@ -416,7 +459,7 @@ fun VideoInfoScreen(
                                             horizontalAlignment = Alignment.CenterHorizontally
                                         ) {
                                             Text(
-                                                text = "📹 Video",
+                                                text = "Video",
                                                 style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                                             )
@@ -441,7 +484,7 @@ fun VideoInfoScreen(
                                             horizontalAlignment = Alignment.CenterHorizontally
                                         ) {
                                             Text(
-                                                text = "🎵 Audio",
+                                                text = "Audio",
                                                 style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                                             )
@@ -467,7 +510,7 @@ fun VideoInfoScreen(
                                         horizontalAlignment = Alignment.CenterHorizontally
                                     ) {
                                         Text(
-                                            text = "🎵 Audio Only",
+                                            text = "Audio Only",
                                             style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
@@ -507,12 +550,13 @@ fun VideoInfoScreen(
             ModalBottomSheet(
                 onDismissRequest = { showAdvancedSheet = false },
                 sheetState = sheetState,
-                modifier = Modifier.fillMaxHeight(0.9f)
+                dragHandle = null,
+                modifier = Modifier.fillMaxSize()
             ) {
                 val formats: List<VideoFormat> = info.formats ?: emptyList()
 
                 FormatSelectionSheet(
-                    title = info.title ?: "Unknown Title",
+                    title = customTitle.ifBlank { info.title ?: "Unknown Title" },
                     thumbnailUrl = info.thumbnail,
                     formats = formats,
                     selectedVideo = selectedVideoFormat,
@@ -531,7 +575,12 @@ fun VideoInfoScreen(
                             showAdvancedSheet = false
                             onBack()
                         }
-                    }
+                    },
+                    onClose = { showAdvancedSheet = false },
+                    uploader = info.uploader,
+                    duration = formatDuration(info.duration),
+                    onUpdateTitle = { customTitle = it },
+                    defaultVideoQuality = defaultVideoQuality
                 )
             }
         }
