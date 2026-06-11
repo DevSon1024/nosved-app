@@ -40,100 +40,62 @@ fun MainContent(mainViewModel: MainViewModel) {
     }
 
     Scaffold(
-        bottomBar = {
-            val showBottomBar = currentDestination != null &&
-                    currentDestination != Screen.VideoInfo.route &&
-                    currentDestination != Screen.Settings.route &&
-                    currentDestination != Screen.AppVersion.route &&
-                    currentDestination != Screen.Credits.route &&
-                    currentDestination != Screen.QualitySettings.route &&
-                    currentDestination != Screen.AdvancedSettings.route &&
-                    currentDestination != Screen.AppearanceSettings.route &&
-                    currentDestination != Screen.SubtitleSettings.route &&
-                    currentDestination != Screen.FormatSelection.route
-
-            if (showBottomBar) {
-                ModernBottomNavigation(
-                    currentDestination = currentDestination,
-                    onNavigate = { route ->
-                        if (currentDestination != route) {
-                            navController.navigate(route) {
-                                popUpTo(navController.graph.startDestinationId)
-                                launchSingleTop = true
-                            }
-                        }
-                    },
-                    onQuickDownload = { mainViewModel.pasteFromClipboard() },
-                    viewModel = mainViewModel
-                )
-            }
-        },
         contentWindowInsets = WindowInsets(0.dp)
     ) { innerPadding ->
         NavHost(
             navController = navController,
             startDestination = Screen.Home.route,
-            modifier = Modifier.padding(bottom = innerPadding.calculateBottomPadding()),
+            modifier = Modifier.padding(innerPadding),
             enterTransition = {
-                when (targetState.destination.route) {
-                    Screen.Home.route -> slideInHorizontally(
-                        initialOffsetX = { -it / 3 },
-                        animationSpec = tween(250, easing = FastOutSlowInEasing)
-                    ) + fadeIn(animationSpec = tween(200, 50))
-
-                    Screen.VideoInfo.route -> slideInVertically(
-                        initialOffsetY = { it / 4 },
-                        animationSpec = tween(300, easing = FastOutSlowInEasing)
-                    ) + fadeIn(animationSpec = tween(200))
-
-                    else -> fadeIn(animationSpec = tween(200)) + scaleIn(
-                        initialScale = 0.95f,
-                        animationSpec = tween(200, easing = FastOutSlowInEasing)
-                    )
+                if (targetState.destination.route == Screen.VideoInfo.route) {
+                    slideIntoContainer(
+                        towards = AnimatedContentTransitionScope.SlideDirection.Up,
+                        animationSpec = tween(400, easing = EaseOutCubic)
+                    ) + fadeIn(animationSpec = tween(300))
+                } else {
+                    slideIntoContainer(
+                        towards = AnimatedContentTransitionScope.SlideDirection.Start,
+                        animationSpec = tween(400, easing = EaseOutCubic)
+                    ) + fadeIn(animationSpec = tween(300))
                 }
             },
             exitTransition = {
-                when (initialState.destination.route) {
-                    Screen.Home.route -> slideOutHorizontally(
-                        targetOffsetX = { -it / 3 },
-                        animationSpec = tween(200, easing = FastOutLinearInEasing)
-                    ) + fadeOut(animationSpec = tween(150))
-
-                    Screen.VideoInfo.route -> slideOutVertically(
-                        targetOffsetY = { it / 4 },
-                        animationSpec = tween(250, easing = FastOutLinearInEasing)
-                    ) + fadeOut(animationSpec = tween(150))
-
-                    else -> fadeOut(animationSpec = tween(150)) + scaleOut(
-                        targetScale = 0.95f,
-                        animationSpec = tween(150, easing = FastOutLinearInEasing)
-                    )
+                if (initialState.destination.route == Screen.VideoInfo.route) {
+                    slideOutOfContainer(
+                        towards = AnimatedContentTransitionScope.SlideDirection.Down,
+                        animationSpec = tween(350, easing = EaseInCubic)
+                    ) + fadeOut(animationSpec = tween(250))
+                } else {
+                    slideOutOfContainer(
+                        towards = AnimatedContentTransitionScope.SlideDirection.Start,
+                        animationSpec = tween(400, easing = EaseInCubic)
+                    ) + fadeOut(animationSpec = tween(300))
                 }
             },
             popEnterTransition = {
-                when (targetState.destination.route) {
-                    Screen.Home.route -> slideInHorizontally(
-                        initialOffsetX = { -it / 3 },
-                        animationSpec = tween(250, easing = FastOutSlowInEasing)
-                    ) + fadeIn(animationSpec = tween(200, 50))
-
-                    else -> fadeIn(animationSpec = tween(200)) + scaleIn(
-                        initialScale = 0.98f,
-                        animationSpec = tween(200, easing = FastOutSlowInEasing)
-                    )
+                if (targetState.destination.route == Screen.VideoInfo.route) {
+                    slideIntoContainer(
+                        towards = AnimatedContentTransitionScope.SlideDirection.Up,
+                        animationSpec = tween(400, easing = EaseOutCubic)
+                    ) + fadeIn(animationSpec = tween(300))
+                } else {
+                    slideIntoContainer(
+                        towards = AnimatedContentTransitionScope.SlideDirection.End,
+                        animationSpec = tween(400, easing = EaseOutCubic)
+                    ) + fadeIn(animationSpec = tween(300))
                 }
             },
             popExitTransition = {
-                when (initialState.destination.route) {
-                    Screen.VideoInfo.route -> slideOutVertically(
-                        targetOffsetY = { it / 4 },
-                        animationSpec = tween(250, easing = FastOutLinearInEasing)
-                    ) + fadeOut(animationSpec = tween(150))
-
-                    else -> fadeOut(animationSpec = tween(150)) + scaleOut(
-                        targetScale = 0.98f,
-                        animationSpec = tween(150, easing = FastOutLinearInEasing)
-                    )
+                if (initialState.destination.route == Screen.VideoInfo.route) {
+                    slideOutOfContainer(
+                        towards = AnimatedContentTransitionScope.SlideDirection.Down,
+                        animationSpec = tween(350, easing = EaseInCubic)
+                    ) + fadeOut(animationSpec = tween(250))
+                } else {
+                    slideOutOfContainer(
+                        towards = AnimatedContentTransitionScope.SlideDirection.End,
+                        animationSpec = tween(400, easing = EaseInCubic)
+                    ) + fadeOut(animationSpec = tween(300))
                 }
             }
         ) {
@@ -161,7 +123,10 @@ fun MainContent(mainViewModel: MainViewModel) {
                 )
             }
             composable(Screen.Downloads.route) {
-                DownloadsScreen(mainViewModel)
+                DownloadsScreen(
+                    viewModel = mainViewModel,
+                    onBack = { navController.navigateUp() }
+                )
             }
             composable(Screen.AppVersion.route) {
                 AppVersionScreen(
@@ -206,95 +171,5 @@ fun MainContent(mainViewModel: MainViewModel) {
                 )
             }
         }
-    }
-}
-
-@Composable
-fun ModernBottomNavigation(
-    currentDestination: String?,
-    onNavigate: (String) -> Unit,
-    onQuickDownload: () -> Unit,
-    viewModel: MainViewModel
-) {
-    val allDownloads by viewModel.allDownloads.collectAsState(initial = emptyList())
-
-    val runningCount = remember(allDownloads) {
-        allDownloads.count {
-            it.status == com.devson.nosved.data.DownloadStatus.DOWNLOADING ||
-                    it.status == com.devson.nosved.data.DownloadStatus.QUEUED
-        }
-    }
-
-    NavigationBar(
-        containerColor = MaterialTheme.colorScheme.surface,
-        tonalElevation = 8.dp
-    ) {
-        // Home Tab
-        NavigationBarItem(
-            icon = {
-                Icon(
-                    Icons.Default.Home,
-                    contentDescription = "Home"
-                )
-            },
-            label = { Text("Home") },
-            selected = currentDestination == Screen.Home.route,
-            onClick = { onNavigate(Screen.Home.route) }
-        )
-
-        // Central Quick Download Button
-        NavigationBarItem(
-            icon = {
-                Box(
-                    contentAlignment = Alignment.Center
-                ) {
-                    FloatingActionButton(
-                        onClick = onQuickDownload,
-                        modifier = Modifier.size(40.dp),
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        elevation = FloatingActionButtonDefaults.elevation(
-                            defaultElevation = 2.dp,
-                            pressedElevation = 6.dp
-                        )
-                    ) {
-                        Icon(
-                            Icons.Default.Download,
-                            "Quick Download",
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                }
-            },
-            label = { Text("Quick") },
-            selected = false,
-            onClick = onQuickDownload
-        )
-
-        // Downloads Tab
-        NavigationBarItem(
-            icon = {
-                if (runningCount > 0) {
-                    BadgedBox(
-                        badge = {
-                            Badge(
-                                containerColor = MaterialTheme.colorScheme.error
-                            ) {
-                                Text(
-                                    "$runningCount",
-                                    style = MaterialTheme.typography.labelSmall
-                                )
-                            }
-                        }
-                    ) {
-                        Icon(Icons.AutoMirrored.Filled.List, "Downloads")
-                    }
-                } else {
-                    Icon(Icons.AutoMirrored.Filled.List, "Downloads")
-                }
-            },
-            label = { Text("Downloads") },
-            selected = currentDestination == Screen.Downloads.route,
-            onClick = { onNavigate(Screen.Downloads.route) }
-        )
     }
 }

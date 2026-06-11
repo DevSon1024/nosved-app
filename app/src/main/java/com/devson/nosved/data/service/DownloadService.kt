@@ -289,7 +289,7 @@ class DownloadService(
                     error = null
                 )
             )
-            showToast("✅ Download completed: ${downloadEntity.title}")
+            showToast("Download completed: ${downloadEntity.title}")
             if (isNotificationEnabled) {
                 notificationHelper.showDownloadCompleteNotification(
                     notificationId,
@@ -301,9 +301,9 @@ class DownloadService(
 
         } catch (e: Exception) {
             if (repository.getDownloadById(downloadId)?.status == DownloadStatus.CANCELLED) {
-                showToast("❌ Download cancelled: ${downloadEntity.title}")
+                showToast("Download cancelled: ${downloadEntity.title}")
             } else {
-                showToast("❌ Download failed: ${e.message ?: ""}")
+                showToast("Download failed: ${e.message ?: ""}")
                 repository.updateDownload(
                     downloadEntity.copy(
                         status = DownloadStatus.FAILED,
@@ -527,7 +527,7 @@ class DownloadService(
                     error = null
                 )
             )
-            showToast("✅ Audio download completed: ${downloadEntity.title}")
+            showToast("Audio download completed: ${downloadEntity.title}")
             if (isNotificationEnabled) {
                 notificationHelper.showDownloadCompleteNotification(
                     notificationId,
@@ -539,9 +539,9 @@ class DownloadService(
 
         } catch (e: Exception) {
             if (repository.getDownloadById(downloadId)?.status == DownloadStatus.CANCELLED) {
-                showToast("❌ Download cancelled: ${downloadEntity.title}")
+                showToast("Download cancelled: ${downloadEntity.title}")
             } else {
-                showToast("❌ Audio download failed: ${e.message ?: ""}")
+                showToast("Audio download failed: ${e.message ?: ""}")
                 repository.updateDownload(
                     downloadEntity.copy(
                         status = DownloadStatus.FAILED,

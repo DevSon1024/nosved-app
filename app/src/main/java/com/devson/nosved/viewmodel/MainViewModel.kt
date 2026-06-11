@@ -428,6 +428,75 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun startAutoDownload(url: String) {
+        currentFetchJob?.cancel()
+        VideoInfoUtil.cancelFetch(url)
+
+        currentFetchJob = viewModelScope.launch(Dispatchers.IO) {
+            _isLoading.value = true
+            try {
+                VideoInfoUtil.fetchVideoInfoProgressive(url) { progress ->
+                    when (progress.stage) {
+                        "Complete", "Cache hit" -> {
+                            progress.basicInfo?.let { info ->
+                                launch(Dispatchers.IO) {
+                                    showToast("Starting direct download...")
+                                    val qualityPrefs = QualityPreferences(context)
+                                    val mode = qualityPrefs.downloadMode.first()
+                                    val videoQual = qualityPrefs.videoQuality.first()
+                                    val audioQual = qualityPrefs.audioQuality.first()
+                                    val videoCont = qualityPrefs.videoContainer.first().lowercase()
+                                    val audioCont = qualityPrefs.audioContainer.first().lowercase()
+                                    val downloadSubs = qualityPrefs.downloadSubtitles.first()
+                                    val subtitleLang = qualityPrefs.customSubtitleLanguages.first()
+
+                                    downloadVideoWithQuality(
+                                        videoInfo = info,
+                                        customTitle = "",
+                                        downloadMode = mode,
+                                        preferredVideoQuality = videoQual,
+                                        preferredAudioQuality = audioQual,
+                                        preferredVideoContainer = videoCont,
+                                        preferredAudioContainer = audioCont,
+                                        downloadSubtitles = downloadSubs,
+                                        subtitleLang = subtitleLang
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }.onFailure { exception ->
+                    showToast("Failed to fetch info: ${exception.message}")
+                }
+            } catch (e: Exception) {
+                showToast("Unexpected error: ${e.message}")
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    fun pasteAndAutoDownload() {
+        try {
+            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            val clipData = clipboard.primaryClip
+            if (clipData != null && clipData.itemCount > 0) {
+                val pastedText = clipData.getItemAt(0).text?.toString() ?: ""
+                if (pastedText.isNotBlank()) {
+                    _currentUrl.value = pastedText
+                    showToast("URL pasted")
+                    startAutoDownload(pastedText)
+                } else {
+                    showToast("Clipboard is empty")
+                }
+            } else {
+                showToast("Clipboard is empty")
+            }
+        } catch (e: Exception) {
+            showToast("Failed to paste from clipboard")
+        }
+    }
+
     private fun isValidUrlComprehensive(url: String): Boolean {
         if (!isValidUrlFormat(url)) return false
         val urlLower = url.lowercase(Locale.ROOT)

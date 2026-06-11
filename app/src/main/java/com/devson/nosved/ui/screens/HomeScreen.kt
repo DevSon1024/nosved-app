@@ -1,8 +1,13 @@
 package com.devson.nosved.ui.screens
 
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -10,9 +15,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
+import com.devson.nosved.data.DownloadStatus
 import com.devson.nosved.viewmodel.MainViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -26,6 +35,10 @@ fun HomeScreen(
 ) {
     val currentUrl by viewModel.currentUrl.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
+    val runningDownloads by viewModel.runningDownloads.collectAsState(initial = emptyList())
+    val downloadProgress by viewModel.downloadProgress.collectAsState()
+    
+    val scrollState = rememberScrollState()
 
     Scaffold(
         topBar = {
@@ -36,20 +49,42 @@ fun HomeScreen(
             )
         },
         floatingActionButton = {
-            // Updated Floating Paste Button (M3 standard)
-            FloatingActionButton(
-                onClick = { viewModel.pasteUrlOnly() },
-                containerColor = MaterialTheme.colorScheme.secondary, // M3 uses primary or secondary
-                contentColor = MaterialTheme.colorScheme.onSecondary,
-                elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 6.dp)
-                // Shape defaults to M3's RoundedCornerShape(16.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.ContentPaste,
-                    contentDescription = "Paste URL Only",
-                    modifier = Modifier.size(24.dp)
-                )
-            }
+            ExtendedFloatingActionButton(
+                onClick = {
+                    if (currentUrl.isBlank()) {
+                        viewModel.pasteAndAutoDownload()
+                    } else {
+                        viewModel.startAutoDownload(currentUrl)
+                    }
+                },
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 6.dp),
+                icon = {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.ContentPaste,
+                            contentDescription = "Paste",
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Icon(
+                            imageVector = Icons.Default.Download,
+                            contentDescription = "Download",
+                            modifier = Modifier
+                                .size(12.dp)
+                                .align(Alignment.BottomEnd)
+                                .offset(x = 4.dp, y = 4.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                },
+                text = {
+                    Text(
+                        text = if (currentUrl.isBlank()) "Paste & Auto-Download" else "Auto Download",
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            )
         },
         floatingActionButtonPosition = FabPosition.End
     ) { paddingValues ->
@@ -61,28 +96,68 @@ fun HomeScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
+                    .verticalScroll(scrollState)
                     .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(24.dp)
+                verticalArrangement = Arrangement.spacedBy(20.dp)
             ) {
-                // URL Input Section
+                // Landing Hero Branding Section
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(24.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = Color.Transparent
+                    )
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(
+                                brush = Brush.linearGradient(
+                                    colors = listOf(
+                                        MaterialTheme.colorScheme.primaryContainer,
+                                        MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f)
+                                    )
+                                )
+                            )
+                            .padding(24.dp)
+                    ) {
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                text = "Welcome to Nosved",
+                                style = MaterialTheme.typography.headlineMedium.copy(
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            )
+                            Text(
+                                text = "Download and extract your favorite video and audio streams. High-speed downloading & FFmpeg muxing supported.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                            )
+                        }
+                    }
+                }
+
+                // URL Input Card
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
-                        // Use standard M3 surface container color
                         containerColor = MaterialTheme.colorScheme.surfaceContainerLow
                     ),
                     elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-                    shape = RoundedCornerShape(16.dp)
+                    shape = RoundedCornerShape(20.dp)
                 ) {
                     Column(
-                        modifier = Modifier.padding(20.dp),
+                        modifier = Modifier.padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        // URL Input Field
                         OutlinedTextField(
                             value = currentUrl,
                             onValueChange = { viewModel.updateUrl(it) },
-                            label = { Text("Enter Video URL") },
+                            label = { Text("Enter Media URL") },
                             placeholder = { Text("https://youtube.com/watch?v=...") },
                             modifier = Modifier.fillMaxWidth(),
                             leadingIcon = {
@@ -93,51 +168,102 @@ fun HomeScreen(
                                     IconButton(onClick = { viewModel.clearUrl() }) {
                                         Icon(Icons.Default.Clear, contentDescription = "Clear")
                                     }
+                                } else {
+                                    IconButton(onClick = { viewModel.pasteUrlOnly() }) {
+                                        Icon(Icons.Default.ContentPaste, contentDescription = "Paste")
+                                    }
                                 }
                             },
-                            singleLine = true
-                            // Removed shape - uses M3 default
+                            singleLine = true,
+                            shape = RoundedCornerShape(12.dp)
                         )
 
-                        // Action Buttons Row
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            // Search/Analyze Button
                             Button(
                                 onClick = { viewModel.fetchVideoInfo(currentUrl) },
                                 modifier = Modifier
-                                    .weight(2f)
-                                    .height(48.dp), // Standard button height
+                                    .weight(1f)
+                                    .height(48.dp),
                                 enabled = !isLoading && currentUrl.isNotBlank(),
-                                // Removed shape - uses M3 default (pill shape)
+                                shape = RoundedCornerShape(12.dp)
                             ) {
                                 if (isLoading) {
                                     CircularProgressIndicator(
                                         modifier = Modifier.size(18.dp),
                                         strokeWidth = 2.dp,
+                                        color = MaterialTheme.colorScheme.onPrimary
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text("Analyzing...")
                                 } else {
                                     Icon(Icons.Default.Search, contentDescription = null)
                                     Spacer(modifier = Modifier.width(8.dp))
-                                    Text("Analyze Video")
+                                    Text("Analyze Stream")
                                 }
                             }
                         }
                     }
                 }
 
-                // Enhanced Loading State
-                if (isLoading) {
+                // Inline Loading Card
+                AnimatedVisibility(
+                    visible = isLoading,
+                    enter = fadeIn() + expandVertically(),
+                    exit = fadeOut() + shrinkVertically()
+                ) {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.primaryContainer
                         ),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(28.dp),
+                                strokeWidth = 3.dp,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.width(16.dp))
+                            Column {
+                                Text(
+                                    text = "Extracting video metadata...",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                                Text(
+                                    text = "Analyzing available formats & audio feeds",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Active Background Processes Monitor
+                Text(
+                    text = "Background Processes",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+
+                if (runningDownloads.isEmpty()) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.3f)
+                        ),
                         shape = RoundedCornerShape(16.dp)
                     ) {
                         Row(
@@ -147,75 +273,106 @@ fun HomeScreen(
                             horizontalArrangement = Arrangement.Center,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(32.dp),
-                                strokeWidth = 4.dp,
-                                color = MaterialTheme.colorScheme.primary
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                             )
-                            Spacer(modifier = Modifier.width(16.dp))
-                            Column {
-                                Text(
-                                    text = "Extracting video information...",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    text = "This will only take a few seconds",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
-                                )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(
+                                text = "No active downloads or FFmpeg tasks in background",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                } else {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        runningDownloads.forEach { download ->
+                            val progress = downloadProgress[download.id]
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceContainer
+                                ),
+                                shape = RoundedCornerShape(16.dp),
+                                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(16.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = download.title,
+                                                style = MaterialTheme.typography.titleSmall,
+                                                fontWeight = FontWeight.Bold,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                            val stepText = progress?.taskDescription ?: when(download.status) {
+                                                DownloadStatus.QUEUED -> "Queued..."
+                                                DownloadStatus.DOWNLOADING -> "Downloading..."
+                                                else -> "Processing..."
+                                            }
+                                            Text(
+                                                text = stepText,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.primary,
+                                                fontWeight = FontWeight.Medium
+                                            )
+                                        }
+                                        IconButton(onClick = { viewModel.cancelDownload(download.id) }) {
+                                            Icon(
+                                                imageVector = Icons.Default.Close,
+                                                contentDescription = "Cancel Task",
+                                                tint = MaterialTheme.colorScheme.error
+                                            )
+                                        }
+                                    }
+
+                                    val currentProg = progress?.progress ?: download.progress
+                                    LinearProgressIndicator(
+                                        progress = { currentProg / 100f },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(6.dp)
+                                            .clip(RoundedCornerShape(3.dp)),
+                                        color = MaterialTheme.colorScheme.primary,
+                                        trackColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                                    )
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "$currentProg%",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        if (progress != null && !progress.speed.isNullOrBlank()) {
+                                            Text(
+                                                text = "${progress.speed} • ETA: ${progress.eta}",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
                 }
-
-                // Recent Features Info (when not loading)
-                if (!isLoading && currentUrl.isBlank()) {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(
-                            // Use standard M3 surface container color
-                            containerColor = MaterialTheme.colorScheme.surfaceContainer
-                        ),
-                        shape = RoundedCornerShape(16.dp)
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(20.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            Text(
-                                text = "🚀 Features",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface // Adjusted for surfaceContainer
-                            )
-
-                            FeatureItem(
-                                icon = "🎬",
-                                title = "Multiple Platforms",
-                                description = "YouTube, Instagram, TikTok, Twitter supported"
-                            )
-
-                            FeatureItem(
-                                icon = "⚙️",
-                                title = "Quality Selection",
-                                description = "Choose video quality and audio format"
-                            )
-
-                            FeatureItem(
-                                icon = "📱",
-                                title = "Quick Paste",
-                                description = "Use floating paste button or quick button for direct Download"
-                            )
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.weight(1f))
             }
-
-            // FAB is now part of the Scaffold, so removed from here
         }
     }
 }
@@ -283,7 +440,6 @@ fun HomeTopBarActions(
         }
     }
 
-    // Downloads button with badge
     if (runningCount > 0) {
         BadgedBox(
             badge = {
@@ -307,40 +463,7 @@ fun HomeTopBarActions(
         }
     }
 
-    // Settings button
     IconButton(onClick = onNavigateToSettings) {
         Icon(Icons.Default.Settings, "Settings")
-    }
-}
-
-@Composable
-private fun FeatureItem(
-    icon: String,
-    title: String,
-    description: String
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = icon,
-            style = MaterialTheme.typography.headlineSmall,
-            modifier = Modifier.width(32.dp)
-        )
-        Spacer(modifier = Modifier.width(12.dp))
-        Column {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurface // Adjusted for surfaceContainer
-            )
-            Text(
-                text = description,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant // Use onSurfaceVariant
-            )
-        }
     }
 }

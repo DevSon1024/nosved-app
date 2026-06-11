@@ -281,7 +281,7 @@ fun AnimatedSuccessIndicator() {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = "✅ Download completed",
+            text = "Download completed",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.primary
         )

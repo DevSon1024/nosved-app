@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material3.*
@@ -28,7 +29,10 @@ import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DownloadsScreen(viewModel: MainViewModel) {
+fun DownloadsScreen(
+    viewModel: MainViewModel,
+    onBack: () -> Unit
+) {
     var selectedTab by remember { mutableStateOf(DownloadTabType.ALL) }
     val context = LocalContext.current
 
@@ -68,6 +72,14 @@ fun DownloadsScreen(viewModel: MainViewModel) {
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.SemiBold
                     )
+                },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            imageVector = Icons.Default.ArrowBack,
+                            contentDescription = "Back"
+                        )
+                    }
                 },
                 actions = {
                     IconButton(onClick = { /* TODO: Implement search */ }) {
