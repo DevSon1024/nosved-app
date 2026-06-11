@@ -36,6 +36,7 @@ fun VideoInfoScreen(
     val videoInfo by viewModel.videoInfo.collectAsState()
     val selectedVideoFormat by viewModel.selectedVideoFormat.collectAsState()
     val selectedAudioFormat by viewModel.selectedAudioFormat.collectAsState()
+    val disablePreview by viewModel.disablePreview.collectAsState()
 
     var showQualityDialog by remember { mutableStateOf(false) }
     var showAdvancedSheet by remember { mutableStateOf(false) }
@@ -185,21 +186,52 @@ fun VideoInfoScreen(
             ) {
                 // Thumbnail
                 item {
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .aspectRatio(16f / 9f),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
-                        shape = RoundedCornerShape(16.dp) // Standardized rounding
-                    ) {
-                        AsyncImage(
-                            model = info.thumbnail,
-                            contentDescription = "Video Thumbnail",
+                    if (!disablePreview) {
+                        Card(
                             modifier = Modifier
-                                .fillMaxSize()
-                                .clip(RoundedCornerShape(16.dp)),
-                            contentScale = ContentScale.Crop
-                        )
+                                .fillMaxWidth()
+                                .aspectRatio(16f / 9f),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
+                            shape = RoundedCornerShape(16.dp) // Standardized rounding
+                        ) {
+                            AsyncImage(
+                                model = info.thumbnail,
+                                contentDescription = "Video Thumbnail",
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .clip(RoundedCornerShape(16.dp)),
+                                contentScale = ContentScale.Crop
+                            )
+                        }
+                    } else {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(120.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                            ),
+                            shape = RoundedCornerShape(16.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.VisibilityOff,
+                                        contentDescription = "Preview Disabled",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "Preview disabled by privacy settings",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
 

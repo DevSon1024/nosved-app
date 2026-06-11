@@ -125,6 +125,15 @@ class DownloadService(
     ) = withContext(Dispatchers.IO) {
         val downloadId = downloadEntity.id
         val notificationId = getNotificationId(downloadId)
+        val prefs = context.getSharedPreferences("app_settings", Context.MODE_PRIVATE)
+        val isNotificationEnabled = prefs.getBoolean("download_notification_enabled", true)
+        val detailedOutput = prefs.getBoolean("detailed_output", false)
+        val saveThumbnail = prefs.getBoolean("save_thumbnail", true)
+        val downloadPlaylist = prefs.getBoolean("download_playlist", true)
+        val downloadArchive = prefs.getBoolean("download_archive", false)
+        val enableSponsorsBlock = prefs.getBoolean("enable_sponsors_block", false)
+        val incognitoMode = prefs.getBoolean("incognito_mode", false)
+
         try {
             if (repository.getDownloadById(downloadId)?.status != DownloadStatus.DOWNLOADING) {
                 repository.updateDownloadStatus(downloadId, DownloadStatus.DOWNLOADING)
@@ -151,6 +160,23 @@ class DownloadService(
             request.addOption("--retries", "3")
             request.addOption("--fragment-retries", "3")
 
+            if (detailedOutput) {
+                request.addOption("-v")
+            }
+            if (saveThumbnail) {
+                request.addOption("--write-thumbnail")
+            }
+            if (!downloadPlaylist) {
+                request.addOption("--no-playlist")
+            }
+            if (downloadArchive) {
+                val archiveFile = File(context.filesDir, "download_archive.txt")
+                request.addOption("--download-archive", archiveFile.absolutePath)
+            }
+            if (enableSponsorsBlock) {
+                request.addOption("--sponsorblock-remove", "all")
+            }
+
             if (downloadSubtitles) {
                 request.addOption("--write-subs")
                 request.addOption("--sub-lang", subtitleLang)
@@ -176,11 +202,13 @@ class DownloadService(
                     )
                     progressFlow.value = progressFlow.value + (downloadId to progressData)
                     repository.updateDownloadProgress(downloadId, progressData.progress, 0L)
-                    notificationHelper.showDownloadProgressNotification(
-                        notificationId,
-                        downloadEntity.title,
-                        line
-                    )
+                    if (isNotificationEnabled) {
+                        notificationHelper.showDownloadProgressNotification(
+                            notificationId,
+                            downloadEntity.title,
+                            line
+                        )
+                    }
                 }
             }
 
@@ -200,12 +228,14 @@ class DownloadService(
                 )
             )
             showToast("✅ Download completed: ${downloadEntity.title}")
-            notificationHelper.showDownloadCompleteNotification(
-                notificationId,
-                downloadEntity.title,
-                finalFilePath.absolutePath,
-                isAudioOnly = false // This is a video download
-            )
+            if (isNotificationEnabled) {
+                notificationHelper.showDownloadCompleteNotification(
+                    notificationId,
+                    downloadEntity.title,
+                    finalFilePath.absolutePath,
+                    isAudioOnly = false // This is a video download
+                )
+            }
 
         } catch (e: Exception) {
             if (repository.getDownloadById(downloadId)?.status == DownloadStatus.CANCELLED) {
@@ -222,6 +252,9 @@ class DownloadService(
             notificationHelper.cancelNotification(notificationId)
         } finally {
             progressFlow.value = progressFlow.value - downloadId
+            if (incognitoMode) {
+                repository.deleteDownload(downloadId)
+            }
         }
     }
 
@@ -286,6 +319,15 @@ class DownloadService(
     ) = withContext(Dispatchers.IO) {
         val downloadId = downloadEntity.id
         val notificationId = getNotificationId(downloadId)
+        val prefs = context.getSharedPreferences("app_settings", Context.MODE_PRIVATE)
+        val isNotificationEnabled = prefs.getBoolean("download_notification_enabled", true)
+        val detailedOutput = prefs.getBoolean("detailed_output", false)
+        val saveThumbnail = prefs.getBoolean("save_thumbnail", true)
+        val downloadPlaylist = prefs.getBoolean("download_playlist", true)
+        val downloadArchive = prefs.getBoolean("download_archive", false)
+        val enableSponsorsBlock = prefs.getBoolean("enable_sponsors_block", false)
+        val incognitoMode = prefs.getBoolean("incognito_mode", false)
+
         try {
             if (repository.getDownloadById(downloadId)?.status != DownloadStatus.DOWNLOADING) {
                 repository.updateDownloadStatus(downloadId, DownloadStatus.DOWNLOADING)
@@ -304,6 +346,23 @@ class DownloadService(
             request.addOption("-x") // Extract audio
             request.addOption("--audio-format", audioExtension)
             request.addOption("--no-warnings")
+
+            if (detailedOutput) {
+                request.addOption("-v")
+            }
+            if (saveThumbnail) {
+                request.addOption("--write-thumbnail")
+            }
+            if (!downloadPlaylist) {
+                request.addOption("--no-playlist")
+            }
+            if (downloadArchive) {
+                val archiveFile = File(context.filesDir, "download_archive.txt")
+                request.addOption("--download-archive", archiveFile.absolutePath)
+            }
+            if (enableSponsorsBlock) {
+                request.addOption("--sponsorblock-remove", "all")
+            }
 
             if (downloadSubtitles) {
                 request.addOption("--write-subs")
@@ -329,11 +388,13 @@ class DownloadService(
                     )
                     progressFlow.value = progressFlow.value + (downloadId to progressData)
                     repository.updateDownloadProgress(downloadId, progressData.progress, 0L)
-                    notificationHelper.showDownloadProgressNotification(
-                        notificationId,
-                        downloadEntity.title,
-                        line
-                    )
+                    if (isNotificationEnabled) {
+                        notificationHelper.showDownloadProgressNotification(
+                            notificationId,
+                            downloadEntity.title,
+                            line
+                        )
+                    }
                 }
             }
 
@@ -353,12 +414,14 @@ class DownloadService(
                 )
             )
             showToast("✅ Audio download completed: ${downloadEntity.title}")
-            notificationHelper.showDownloadCompleteNotification(
-                notificationId,
-                downloadEntity.title,
-                finalFilePath.absolutePath,
-                isAudioOnly = true // This is an audio download
-            )
+            if (isNotificationEnabled) {
+                notificationHelper.showDownloadCompleteNotification(
+                    notificationId,
+                    downloadEntity.title,
+                    finalFilePath.absolutePath,
+                    isAudioOnly = true // This is an audio download
+                )
+            }
 
         } catch (e: Exception) {
             if (repository.getDownloadById(downloadId)?.status == DownloadStatus.CANCELLED) {
@@ -375,6 +438,9 @@ class DownloadService(
             notificationHelper.cancelNotification(notificationId)
         } finally {
             progressFlow.value = progressFlow.value - downloadId
+            if (incognitoMode) {
+                repository.deleteDownload(downloadId)
+            }
         }
     }
 

@@ -28,6 +28,49 @@ class SettingsRepository(context: Context) {
     private val _isNavBarTransparentFlow = MutableStateFlow(prefs.getBoolean("is_navbar_transparent", true))
     val isNavBarTransparentFlow: StateFlow<Boolean> = _isNavBarTransparentFlow.asStateFlow()
 
+    // YT-DLP update configurations
+    private val _ytdlpUpdateChannelFlow = MutableStateFlow(prefs.getString("ytdlp_update_channel", "STABLE") ?: "STABLE")
+    val ytdlpUpdateChannelFlow: StateFlow<String> = _ytdlpUpdateChannelFlow.asStateFlow()
+
+    private val _ytdlpUpdateIntervalFlow = MutableStateFlow(
+        try {
+            YtDlpUpdateInterval.valueOf(prefs.getString("ytdlp_update_interval", YtDlpUpdateInterval.WEEKLY.name) ?: YtDlpUpdateInterval.WEEKLY.name)
+        } catch (e: Exception) {
+            YtDlpUpdateInterval.WEEKLY
+        }
+    )
+    val ytdlpUpdateIntervalFlow: StateFlow<YtDlpUpdateInterval> = _ytdlpUpdateIntervalFlow.asStateFlow()
+
+    // General settings configurations
+    private val _downloadNotificationFlow = MutableStateFlow(prefs.getBoolean("download_notification_enabled", true))
+    val downloadNotificationFlow: StateFlow<Boolean> = _downloadNotificationFlow.asStateFlow()
+
+    private val _configureBeforeDownloadFlow = MutableStateFlow(prefs.getBoolean("configure_before_download", true))
+    val configureBeforeDownloadFlow: StateFlow<Boolean> = _configureBeforeDownloadFlow.asStateFlow()
+
+    private val _saveThumbnailFlow = MutableStateFlow(prefs.getBoolean("save_thumbnail", true))
+    val saveThumbnailFlow: StateFlow<Boolean> = _saveThumbnailFlow.asStateFlow()
+
+    private val _detailedOutputFlow = MutableStateFlow(prefs.getBoolean("detailed_output", false))
+    val detailedOutputFlow: StateFlow<Boolean> = _detailedOutputFlow.asStateFlow()
+
+    // Privacy settings configurations
+    private val _incognitoModeFlow = MutableStateFlow(prefs.getBoolean("incognito_mode", false))
+    val incognitoModeFlow: StateFlow<Boolean> = _incognitoModeFlow.asStateFlow()
+
+    private val _disablePreviewFlow = MutableStateFlow(prefs.getBoolean("disable_preview", false))
+    val disablePreviewFlow: StateFlow<Boolean> = _disablePreviewFlow.asStateFlow()
+
+    // Advanced settings configurations
+    private val _downloadPlaylistFlow = MutableStateFlow(prefs.getBoolean("download_playlist", true))
+    val downloadPlaylistFlow: StateFlow<Boolean> = _downloadPlaylistFlow.asStateFlow()
+
+    private val _downloadArchiveFlow = MutableStateFlow(prefs.getBoolean("download_archive", false))
+    val downloadArchiveFlow: StateFlow<Boolean> = _downloadArchiveFlow.asStateFlow()
+
+    private val _enableSponsorsBlockFlow = MutableStateFlow(prefs.getBoolean("enable_sponsors_block", false))
+    val enableSponsorsBlockFlow: StateFlow<Boolean> = _enableSponsorsBlockFlow.asStateFlow()
+
     private val preferenceChangeListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         when (key) {
             "is_dark_theme" -> {
@@ -45,6 +88,43 @@ class SettingsRepository(context: Context) {
             "is_navbar_transparent" -> {
                 _isNavBarTransparentFlow.value = prefs.getBoolean("is_navbar_transparent", true)
             }
+            "ytdlp_update_channel" -> {
+                _ytdlpUpdateChannelFlow.value = prefs.getString("ytdlp_update_channel", "STABLE") ?: "STABLE"
+            }
+            "ytdlp_update_interval" -> {
+                _ytdlpUpdateIntervalFlow.value = try {
+                    YtDlpUpdateInterval.valueOf(prefs.getString("ytdlp_update_interval", YtDlpUpdateInterval.WEEKLY.name) ?: YtDlpUpdateInterval.WEEKLY.name)
+                } catch (e: Exception) {
+                    YtDlpUpdateInterval.WEEKLY
+                }
+            }
+            "download_notification_enabled" -> {
+                _downloadNotificationFlow.value = prefs.getBoolean("download_notification_enabled", true)
+            }
+            "configure_before_download" -> {
+                _configureBeforeDownloadFlow.value = prefs.getBoolean("configure_before_download", true)
+            }
+            "save_thumbnail" -> {
+                _saveThumbnailFlow.value = prefs.getBoolean("save_thumbnail", true)
+            }
+            "detailed_output" -> {
+                _detailedOutputFlow.value = prefs.getBoolean("detailed_output", false)
+            }
+            "incognito_mode" -> {
+                _incognitoModeFlow.value = prefs.getBoolean("incognito_mode", false)
+            }
+            "disable_preview" -> {
+                _disablePreviewFlow.value = prefs.getBoolean("disable_preview", false)
+            }
+            "download_playlist" -> {
+                _downloadPlaylistFlow.value = prefs.getBoolean("download_playlist", true)
+            }
+            "download_archive" -> {
+                _downloadArchiveFlow.value = prefs.getBoolean("download_archive", false)
+            }
+            "enable_sponsors_block" -> {
+                _enableSponsorsBlockFlow.value = prefs.getBoolean("enable_sponsors_block", false)
+            }
         }
     }
 
@@ -56,12 +136,8 @@ class SettingsRepository(context: Context) {
         prefs.unregisterOnSharedPreferenceChangeListener(preferenceChangeListener)
     }
 
-    companion object {
-        private const val PREF_UPDATE_INTERVAL = "ytdlp_update_interval"
-    }
-
     fun getUpdateInterval(): YtDlpUpdateInterval {
-        val intervalName = prefs.getString(PREF_UPDATE_INTERVAL, YtDlpUpdateInterval.WEEKLY.name)
+        val intervalName = prefs.getString("ytdlp_update_interval", YtDlpUpdateInterval.WEEKLY.name)
         return try {
             YtDlpUpdateInterval.valueOf(intervalName ?: YtDlpUpdateInterval.WEEKLY.name)
         } catch (e: IllegalArgumentException) {
@@ -70,7 +146,7 @@ class SettingsRepository(context: Context) {
     }
 
     fun setUpdateInterval(interval: YtDlpUpdateInterval) {
-        prefs.edit().putString(PREF_UPDATE_INTERVAL, interval.name).apply()
+        prefs.edit().putString("ytdlp_update_interval", interval.name).apply()
     }
 
     fun setDarkTheme(isDark: Boolean) {
@@ -95,5 +171,45 @@ class SettingsRepository(context: Context) {
 
     fun setNavBarTransparent(transparent: Boolean) {
         prefs.edit().putBoolean("is_navbar_transparent", transparent).apply()
+    }
+
+    fun setYtdlpUpdateChannel(channel: String) {
+        prefs.edit().putString("ytdlp_update_channel", channel).apply()
+    }
+
+    fun setDownloadNotification(enabled: Boolean) {
+        prefs.edit().putBoolean("download_notification_enabled", enabled).apply()
+    }
+
+    fun setConfigureBeforeDownload(enabled: Boolean) {
+        prefs.edit().putBoolean("configure_before_download", enabled).apply()
+    }
+
+    fun setSaveThumbnail(enabled: Boolean) {
+        prefs.edit().putBoolean("save_thumbnail", enabled).apply()
+    }
+
+    fun setDetailedOutput(enabled: Boolean) {
+        prefs.edit().putBoolean("detailed_output", enabled).apply()
+    }
+
+    fun setIncognitoMode(enabled: Boolean) {
+        prefs.edit().putBoolean("incognito_mode", enabled).apply()
+    }
+
+    fun setDisablePreview(enabled: Boolean) {
+        prefs.edit().putBoolean("disable_preview", enabled).apply()
+    }
+
+    fun setDownloadPlaylist(enabled: Boolean) {
+        prefs.edit().putBoolean("download_playlist", enabled).apply()
+    }
+
+    fun setDownloadArchive(enabled: Boolean) {
+        prefs.edit().putBoolean("download_archive", enabled).apply()
+    }
+
+    fun setEnableSponsorsBlock(enabled: Boolean) {
+        prefs.edit().putBoolean("enable_sponsors_block", enabled).apply()
     }
 }

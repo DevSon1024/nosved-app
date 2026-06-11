@@ -39,7 +39,16 @@ fun MainContent(mainViewModel: MainViewModel) {
 
     Scaffold(
         bottomBar = {
-            if (currentDestination != Screen.VideoInfo.route) {
+            val showBottomBar = currentDestination != null &&
+                    currentDestination != Screen.VideoInfo.route &&
+                    currentDestination != Screen.Settings.route &&
+                    currentDestination != Screen.AppVersion.route &&
+                    currentDestination != Screen.Credits.route &&
+                    currentDestination != Screen.QualitySettings.route &&
+                    currentDestination != Screen.AdvancedSettings.route &&
+                    currentDestination != Screen.AppearanceSettings.route
+
+            if (showBottomBar) {
                 ModernBottomNavigation(
                     currentDestination = currentDestination,
                     onNavigate = { route ->

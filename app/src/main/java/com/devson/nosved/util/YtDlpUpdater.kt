@@ -20,12 +20,12 @@ enum class YtDlpUpdateInterval(val days: Int, val displayName: String) {
 
 class YtDlpUpdater(private val context: Application) {
 
-    private val prefs: SharedPreferences = context.getSharedPreferences("ytdlp_updater", Context.MODE_PRIVATE)
+    private val prefs: SharedPreferences = context.getSharedPreferences("app_settings", Context.MODE_PRIVATE)
 
     companion object {
         private const val TAG = "YtDlpUpdater"
         private const val PREF_LAST_UPDATE = "last_update_timestamp"
-        private const val PREF_UPDATE_INTERVAL = "update_interval"
+        private const val PREF_UPDATE_INTERVAL = "ytdlp_update_interval"
         private const val PREF_CURRENT_VERSION = "current_version"
     }
 
@@ -57,9 +57,17 @@ class YtDlpUpdater(private val context: Application) {
                             Log.d(TAG, "YoutubeDL already initialized")
                         }
 
+                        // Determine update channel from preferences
+                        val channelStr = prefs.getString("ytdlp_update_channel", "STABLE") ?: "STABLE"
+                        val updateChannel = if (channelStr == "NIGHTLY") {
+                            YoutubeDL.UpdateChannel.NIGHTLY
+                        } else {
+                            YoutubeDL.UpdateChannel.STABLE
+                        }
+
                         // Update YT-DLP
-                        Log.d(TAG, "Updating YT-DLP...")
-                        val updateStatus = YoutubeDL.getInstance().updateYoutubeDL(context)
+                        Log.d(TAG, "Updating YT-DLP on channel: $channelStr...")
+                        val updateStatus = YoutubeDL.getInstance().updateYoutubeDL(context, updateChannel)
                         Log.d(TAG, "Update status: $updateStatus")
 
                         // Get updated version info

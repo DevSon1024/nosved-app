@@ -10,6 +10,7 @@ import com.devson.nosved.util.NotificationHelper
 import com.devson.nosved.data.DownloadDatabase
 import com.devson.nosved.data.DownloadMode
 import com.devson.nosved.data.DownloadProgress
+import com.devson.nosved.data.QualityPreferences
 import com.devson.nosved.data.repository.SettingsRepository
 import com.devson.nosved.data.repository.DownloadRepository
 import com.devson.nosved.data.service.DownloadService
@@ -26,6 +27,7 @@ import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -76,6 +78,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val runningDownloads = downloadRepository.runningDownloads
     val completedDownloads = downloadRepository.completedDownloads
     val failedDownloads = downloadRepository.failedDownloads
+
+    val configureBeforeDownload = settingsRepository.configureBeforeDownloadFlow
+    val disablePreview = settingsRepository.disablePreviewFlow
 
     init {
         notificationHelper.createNotificationChannel()
@@ -139,11 +144,38 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         "Extracting info" -> showToast("⚡ Extracting video info...")
                         "Complete", "Cache hit" -> {
                             progress.basicInfo?.let { info ->
-                                _videoInfo.value = info
-                                launch(Dispatchers.Default) {
-                                    setDefaultFormatsOptimized(info)
+                                val shouldConfigure = settingsRepository.configureBeforeDownloadFlow.value
+                                if (shouldConfigure) {
+                                    _videoInfo.value = info
+                                    launch(Dispatchers.Default) {
+                                        setDefaultFormatsOptimized(info)
+                                    }
+                                    showToast("Video info loaded!")
+                                } else {
+                                    launch(Dispatchers.IO) {
+                                        showToast("Starting direct download...")
+                                        val qualityPrefs = QualityPreferences(context)
+                                        val mode = qualityPrefs.downloadMode.first()
+                                        val videoQual = qualityPrefs.videoQuality.first()
+                                        val audioQual = qualityPrefs.audioQuality.first()
+                                        val videoCont = qualityPrefs.videoContainer.first().lowercase()
+                                        val audioCont = qualityPrefs.audioContainer.first().lowercase()
+                                        val downloadSubs = qualityPrefs.downloadSubtitles.first()
+                                        val subtitleLang = qualityPrefs.customSubtitleLanguages.first()
+
+                                        downloadVideoWithQuality(
+                                            videoInfo = info,
+                                            customTitle = "",
+                                            downloadMode = mode,
+                                            preferredVideoQuality = videoQual,
+                                            preferredAudioQuality = audioQual,
+                                            preferredVideoContainer = videoCont,
+                                            preferredAudioContainer = audioCont,
+                                            downloadSubtitles = downloadSubs,
+                                            subtitleLang = subtitleLang
+                                        )
+                                    }
                                 }
-                                showToast("Video info loaded!")
                             }
                         }
                     }
