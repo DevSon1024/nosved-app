@@ -20,7 +20,6 @@ import com.devson.nosved.viewmodel.MainViewModel
 import com.devson.nosved.data.DownloadMode
 import com.devson.nosved.data.QualityPreferences
 import com.devson.nosved.ui.common.components.QualitySelectionDialog
-import com.devson.nosved.ui.common.sheet.FormatSelectionSheet
 import com.yausername.youtubedl_android.mapper.VideoFormat
 import androidx.compose.ui.text.style.TextOverflow
 
@@ -29,6 +28,7 @@ import androidx.compose.ui.text.style.TextOverflow
 fun VideoInfoScreen(
     viewModel: MainViewModel,
     onBack: () -> Unit,
+    onNavigateToFormatSelection: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -40,17 +40,11 @@ fun VideoInfoScreen(
     val disablePreview by viewModel.disablePreview.collectAsState()
 
     var showQualityDialog by remember { mutableStateOf(false) }
-    var showAdvancedSheet by remember { mutableStateOf(false) }
     var selectedDownloadMode by remember { mutableStateOf(DownloadMode.VIDEO_AUDIO) }
 
-    // State for the editable title
+    // Local editable title for download and inline editing
     var customTitle by remember(videoInfo) { mutableStateOf(videoInfo?.title ?: "") }
     var isEditingTitle by remember { mutableStateOf(false) }
-
-    val sheetState = rememberModalBottomSheetState(
-        skipPartiallyExpanded = true,
-        confirmValueChange = { it != SheetValue.Hidden }
-    )
 
     // Collect quality preferences
     val defaultVideoQuality by qualityPrefs.videoQuality.collectAsState(initial = "720p")
@@ -132,7 +126,7 @@ fun VideoInfoScreen(
                             }
 
                             FilledTonalButton(
-                                onClick = { showAdvancedSheet = true },
+                                onClick = { onNavigateToFormatSelection() },
                                 modifier = Modifier.weight(1f)
                             ) {
                                 Icon(
@@ -539,50 +533,10 @@ fun VideoInfoScreen(
                 onModeChange = { selectedDownloadMode = it },
                 onAdvancedClick = {
                     showQualityDialog = false
-                    showAdvancedSheet = true
+                    onNavigateToFormatSelection()
                 },
                 onDismiss = { showQualityDialog = false }
             )
-        }
-
-        // Advanced Format Selection Sheet
-        if (showAdvancedSheet) {
-            ModalBottomSheet(
-                onDismissRequest = { showAdvancedSheet = false },
-                sheetState = sheetState,
-                dragHandle = null,
-                modifier = Modifier.fillMaxSize()
-            ) {
-                val formats: List<VideoFormat> = info.formats ?: emptyList()
-
-                FormatSelectionSheet(
-                    title = customTitle.ifBlank { info.title ?: "Unknown Title" },
-                    thumbnailUrl = info.thumbnail,
-                    formats = formats,
-                    selectedVideo = selectedVideoFormat,
-                    selectedAudio = selectedAudioFormat,
-                    onSelectVideo = { format -> viewModel.selectVideoFormat(format) },
-                    onSelectAudio = { format -> viewModel.selectAudioFormat(format) },
-                    onSelectSuggested = { video, audio ->
-                        viewModel.selectVideoFormat(video)
-                        viewModel.selectAudioFormat(audio)
-                    },
-                    onDownload = {
-                        val videoFormat = selectedVideoFormat
-                        val audioFormat = selectedAudioFormat
-                        if (videoFormat != null && audioFormat != null) {
-                            viewModel.downloadVideo(info, videoFormat, audioFormat, customTitle)
-                            showAdvancedSheet = false
-                            onBack()
-                        }
-                    },
-                    onClose = { showAdvancedSheet = false },
-                    uploader = info.uploader,
-                    duration = formatDuration(info.duration),
-                    onUpdateTitle = { customTitle = it },
-                    defaultVideoQuality = defaultVideoQuality
-                )
-            }
         }
     }
 }

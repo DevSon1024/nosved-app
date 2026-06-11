@@ -19,6 +19,7 @@ import com.devson.nosved.ui.screens.settings.AppearanceSettingsScreen
 import com.devson.nosved.ui.screens.settings.CreditsScreen
 import com.devson.nosved.ui.screens.settings.QualitySettingsScreen
 import com.devson.nosved.ui.screens.settings.SubtitleScreen
+import com.devson.nosved.ui.screens.FormatSelectionScreen
 import com.devson.nosved.viewmodel.MainViewModel
 
 @Composable
@@ -48,7 +49,8 @@ fun MainContent(mainViewModel: MainViewModel) {
                     currentDestination != Screen.QualitySettings.route &&
                     currentDestination != Screen.AdvancedSettings.route &&
                     currentDestination != Screen.AppearanceSettings.route &&
-                    currentDestination != Screen.SubtitleSettings.route
+                    currentDestination != Screen.SubtitleSettings.route &&
+                    currentDestination != Screen.FormatSelection.route
 
             if (showBottomBar) {
                 ModernBottomNavigation(
@@ -150,7 +152,12 @@ fun MainContent(mainViewModel: MainViewModel) {
             composable(Screen.VideoInfo.route) {
                 VideoInfoScreen(
                     viewModel = mainViewModel,
-                    onBack = { navController.navigateUp() }
+                    onBack = { navController.navigateUp() },
+                    onNavigateToFormatSelection = {
+                        navController.navigate(Screen.FormatSelection.route) {
+                            launchSingleTop = true
+                        }
+                    }
                 )
             }
             composable(Screen.Downloads.route) {
@@ -191,6 +198,12 @@ fun MainContent(mainViewModel: MainViewModel) {
             }
             composable(Screen.SubtitleSettings.route) {
                 SubtitleScreen(onNavigateBack = { navController.navigateUp() })
+            }
+            composable(Screen.FormatSelection.route) {
+                FormatSelectionScreen(
+                    viewModel = mainViewModel,
+                    onNavigateBack = { navController.navigateUp() }
+                )
             }
         }
     }
