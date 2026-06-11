@@ -18,6 +18,7 @@ import com.devson.nosved.ui.screens.settings.AppVersionScreen
 import com.devson.nosved.ui.screens.settings.AppearanceSettingsScreen
 import com.devson.nosved.ui.screens.settings.CreditsScreen
 import com.devson.nosved.ui.screens.settings.QualitySettingsScreen
+import com.devson.nosved.ui.screens.settings.SubtitleScreen
 import com.devson.nosved.viewmodel.MainViewModel
 
 @Composable
@@ -46,7 +47,8 @@ fun MainContent(mainViewModel: MainViewModel) {
                     currentDestination != Screen.Credits.route &&
                     currentDestination != Screen.QualitySettings.route &&
                     currentDestination != Screen.AdvancedSettings.route &&
-                    currentDestination != Screen.AppearanceSettings.route
+                    currentDestination != Screen.AppearanceSettings.route &&
+                    currentDestination != Screen.SubtitleSettings.route
 
             if (showBottomBar) {
                 ModernBottomNavigation(
@@ -176,13 +178,19 @@ fun MainContent(mainViewModel: MainViewModel) {
                 )
             }
             composable(Screen.QualitySettings.route) {
-                QualitySettingsScreen(onNavigateBack = { navController.navigateUp() })
+                QualitySettingsScreen(
+                    onNavigateBack = { navController.navigateUp() },
+                    onNavigateToSubtitleSettings = { navController.navigate(Screen.SubtitleSettings.route) }
+                )
             }
             composable(Screen.AdvancedSettings.route) {
                 AdvancedSettingsScreen(onNavigateBack = { navController.navigateUp() })
             }
             composable(Screen.AppearanceSettings.route) {
                 AppearanceSettingsScreen(onNavigateBack = { navController.popBackStack() })
+            }
+            composable(Screen.SubtitleSettings.route) {
+                SubtitleScreen(onNavigateBack = { navController.navigateUp() })
             }
         }
     }

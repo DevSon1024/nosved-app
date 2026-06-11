@@ -10,4 +10,5 @@ sealed class Screen(val route: String) {
     object QualitySettings : Screen("quality_settings")
     object AdvancedSettings : Screen("advanced_settings")
     object AppearanceSettings : Screen("appearance_settings")
+    object SubtitleSettings : Screen("subtitle_settings")
 }

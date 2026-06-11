@@ -26,6 +26,9 @@ class QualityPreferences(private val context: Context) {
         // Audio Enhancements
         val EMBED_METADATA_KEY = booleanPreferencesKey("embed_metadata")
         val CONVERT_TO_MP3_KEY = booleanPreferencesKey("convert_to_mp3")
+        val CONVERT_AUDIO_FORMAT_ENABLED_KEY = booleanPreferencesKey("convert_audio_format_enabled")
+        val CONVERT_AUDIO_FORMAT_KEY = stringPreferencesKey("convert_audio_format")
+        val CROP_ARTWORK_KEY = booleanPreferencesKey("crop_artwork")
 
         // Subtitle Settings
         val DOWNLOAD_SUBTITLES_KEY = booleanPreferencesKey("download_subtitles")
@@ -33,6 +36,9 @@ class QualityPreferences(private val context: Context) {
         val CONVERT_SUBTITLES_KEY = booleanPreferencesKey("convert_subtitles")
         val DOWNLOAD_AUTO_CAPTIONS_KEY = booleanPreferencesKey("download_auto_captions")
         val CUSTOM_SUBTITLE_LANGUAGES_KEY = stringPreferencesKey("custom_subtitle_languages")
+        val AUTO_TRANSLATED_SUBTITLES_KEY = booleanPreferencesKey("auto_translated_subtitles")
+        val EMBED_SUBTITLES_KEY = booleanPreferencesKey("embed_subtitles")
+        val KEEP_SUBTITLE_FILES_KEY = booleanPreferencesKey("keep_subtitle_files")
 
         // Advanced Features
         val ENABLE_SPONSORS_BLOCK_KEY = booleanPreferencesKey("enable_sponsors_block")
@@ -41,6 +47,13 @@ class QualityPreferences(private val context: Context) {
         val ENABLE_COOKIES_KEY = booleanPreferencesKey("enable_cookies")
         val MAX_DOWNLOAD_RETRIES_KEY = intPreferencesKey("max_download_retries")
         val PREFERRED_LANGUAGE_KEY = stringPreferencesKey("preferred_language")
+        val PREFERRED_VIDEO_FORMAT_KEY = stringPreferencesKey("preferred_video_format")
+        val REMUX_VIDEO_CONTAINER_KEY = booleanPreferencesKey("remux_video_container")
+        val FORMAT_SORTING_KEY = booleanPreferencesKey("format_sorting")
+        val SORTING_FIELDS_KEY = stringPreferencesKey("sorting_fields")
+        val FORMAT_SELECTION_KEY = booleanPreferencesKey("format_selection")
+        val CLIP_VIDEO_KEY = booleanPreferencesKey("clip_video")
+        val MERGE_MULTIPLE_AUDIO_KEY = booleanPreferencesKey("merge_multiple_audio")
     }
 
     // Basic Quality Flows
@@ -72,6 +85,15 @@ class QualityPreferences(private val context: Context) {
     val convertToMp3: Flow<Boolean> = context.dataStore.data
         .map { preferences -> preferences[CONVERT_TO_MP3_KEY] ?: false }
 
+    val convertAudioFormatEnabled: Flow<Boolean> = context.dataStore.data
+        .map { preferences -> preferences[CONVERT_AUDIO_FORMAT_ENABLED_KEY] ?: false }
+
+    val convertAudioFormat: Flow<String> = context.dataStore.data
+        .map { preferences -> preferences[CONVERT_AUDIO_FORMAT_KEY] ?: "mp3" }
+
+    val cropArtwork: Flow<Boolean> = context.dataStore.data
+        .map { preferences -> preferences[CROP_ARTWORK_KEY] ?: false }
+
     // Subtitle Flows
     val downloadSubtitles: Flow<Boolean> = context.dataStore.data
         .map { preferences -> preferences[DOWNLOAD_SUBTITLES_KEY] ?: false }
@@ -87,6 +109,15 @@ class QualityPreferences(private val context: Context) {
 
     val customSubtitleLanguages: Flow<String> = context.dataStore.data
         .map { preferences -> preferences[CUSTOM_SUBTITLE_LANGUAGES_KEY] ?: "en,es,fr" }
+
+    val autoTranslatedSubtitles: Flow<Boolean> = context.dataStore.data
+        .map { preferences -> preferences[AUTO_TRANSLATED_SUBTITLES_KEY] ?: false }
+
+    val embedSubtitles: Flow<Boolean> = context.dataStore.data
+        .map { preferences -> preferences[EMBED_SUBTITLES_KEY] ?: true }
+
+    val keepSubtitleFiles: Flow<Boolean> = context.dataStore.data
+        .map { preferences -> preferences[KEEP_SUBTITLE_FILES_KEY] ?: false }
 
     // Advanced Feature Flows
     val enableSponsorsBlock: Flow<Boolean> = context.dataStore.data
@@ -106,6 +137,27 @@ class QualityPreferences(private val context: Context) {
 
     val preferredLanguage: Flow<String> = context.dataStore.data
         .map { preferences -> preferences[PREFERRED_LANGUAGE_KEY] ?: "en" }
+
+    val preferredVideoFormat: Flow<String> = context.dataStore.data
+        .map { preferences -> preferences[PREFERRED_VIDEO_FORMAT_KEY] ?: "quality" }
+
+    val remuxVideoContainer: Flow<Boolean> = context.dataStore.data
+        .map { preferences -> preferences[REMUX_VIDEO_CONTAINER_KEY] ?: false }
+
+    val formatSorting: Flow<Boolean> = context.dataStore.data
+        .map { preferences -> preferences[FORMAT_SORTING_KEY] ?: false }
+
+    val sortingFields: Flow<String> = context.dataStore.data
+        .map { preferences -> preferences[SORTING_FIELDS_KEY] ?: "" }
+
+    val formatSelection: Flow<Boolean> = context.dataStore.data
+        .map { preferences -> preferences[FORMAT_SELECTION_KEY] ?: true }
+
+    val clipVideo: Flow<Boolean> = context.dataStore.data
+        .map { preferences -> preferences[CLIP_VIDEO_KEY] ?: false }
+
+    val mergeMultipleAudio: Flow<Boolean> = context.dataStore.data
+        .map { preferences -> preferences[MERGE_MULTIPLE_AUDIO_KEY] ?: false }
 
     // Basic Setters
     suspend fun setVideoQuality(quality: String) {
@@ -151,6 +203,24 @@ class QualityPreferences(private val context: Context) {
         }
     }
 
+    suspend fun setConvertAudioFormatEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[CONVERT_AUDIO_FORMAT_ENABLED_KEY] = enabled
+        }
+    }
+
+    suspend fun setConvertAudioFormat(format: String) {
+        context.dataStore.edit { preferences ->
+            preferences[CONVERT_AUDIO_FORMAT_KEY] = format
+        }
+    }
+
+    suspend fun setCropArtwork(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[CROP_ARTWORK_KEY] = enabled
+        }
+    }
+
     // Subtitle Setters
     suspend fun setDownloadSubtitles(enabled: Boolean) {
         context.dataStore.edit { preferences ->
@@ -179,6 +249,24 @@ class QualityPreferences(private val context: Context) {
     suspend fun setCustomSubtitleLanguages(languages: String) {
         context.dataStore.edit { preferences ->
             preferences[CUSTOM_SUBTITLE_LANGUAGES_KEY] = languages
+        }
+    }
+
+    suspend fun setAutoTranslatedSubtitles(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[AUTO_TRANSLATED_SUBTITLES_KEY] = enabled
+        }
+    }
+
+    suspend fun setEmbedSubtitles(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[EMBED_SUBTITLES_KEY] = enabled
+        }
+    }
+
+    suspend fun setKeepSubtitleFiles(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[KEEP_SUBTITLE_FILES_KEY] = enabled
         }
     }
 
@@ -216,6 +304,48 @@ class QualityPreferences(private val context: Context) {
     suspend fun setPreferredLanguage(language: String) {
         context.dataStore.edit { preferences ->
             preferences[PREFERRED_LANGUAGE_KEY] = language
+        }
+    }
+
+    suspend fun setPreferredVideoFormat(format: String) {
+        context.dataStore.edit { preferences ->
+            preferences[PREFERRED_VIDEO_FORMAT_KEY] = format
+        }
+    }
+
+    suspend fun setRemuxVideoContainer(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[REMUX_VIDEO_CONTAINER_KEY] = enabled
+        }
+    }
+
+    suspend fun setFormatSorting(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[FORMAT_SORTING_KEY] = enabled
+        }
+    }
+
+    suspend fun setSortingFields(fields: String) {
+        context.dataStore.edit { preferences ->
+            preferences[SORTING_FIELDS_KEY] = fields
+        }
+    }
+
+    suspend fun setFormatSelection(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[FORMAT_SELECTION_KEY] = enabled
+        }
+    }
+
+    suspend fun setClipVideo(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[CLIP_VIDEO_KEY] = enabled
+        }
+    }
+
+    suspend fun setMergeMultipleAudio(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[MERGE_MULTIPLE_AUDIO_KEY] = enabled
         }
     }
 }

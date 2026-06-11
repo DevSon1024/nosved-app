@@ -8,6 +8,8 @@ import com.devson.nosved.data.DownloadEntity
 import com.devson.nosved.data.DownloadProgress
 import com.devson.nosved.data.DownloadStatus
 import com.devson.nosved.data.repository.DownloadRepository
+import com.devson.nosved.data.QualityPreferences
+import kotlinx.coroutines.flow.first
 import com.devson.nosved.util.VideoInfoUtil
 import com.devson.nosved.util.extractETA
 import com.devson.nosved.util.extractSpeed
@@ -134,6 +136,21 @@ class DownloadService(
         val enableSponsorsBlock = prefs.getBoolean("enable_sponsors_block", false)
         val incognitoMode = prefs.getBoolean("incognito_mode", false)
 
+        val qualityPrefs = QualityPreferences(context)
+        val embedMetadata = qualityPrefs.embedMetadata.first()
+        val cropArtwork = qualityPrefs.cropArtwork.first()
+        val remuxVideoContainer = qualityPrefs.remuxVideoContainer.first()
+        val downloadSubtitlesOption = qualityPrefs.downloadSubtitles.first()
+        val subtitleLanguages = qualityPrefs.customSubtitleLanguages.first()
+        val convertSubtitles = qualityPrefs.convertSubtitles.first()
+        val subtitleFormat = qualityPrefs.subtitleFormat.first()
+        val downloadAutoCaptions = qualityPrefs.downloadAutoCaptions.first()
+        val autoTranslatedSubtitles = qualityPrefs.autoTranslatedSubtitles.first()
+        val embedSubtitles = qualityPrefs.embedSubtitles.first()
+        val keepSubtitleFiles = qualityPrefs.keepSubtitleFiles.first()
+        val formatSorting = qualityPrefs.formatSorting.first()
+        val sortingFields = qualityPrefs.sortingFields.first()
+
         try {
             if (repository.getDownloadById(downloadId)?.status != DownloadStatus.DOWNLOADING) {
                 repository.updateDownloadStatus(downloadId, DownloadStatus.DOWNLOADING)
@@ -143,13 +160,21 @@ class DownloadService(
             val nosvedDir = File(downloadDir, "nosved")
             if (!nosvedDir.exists()) nosvedDir.mkdirs()
 
+            val actualExtension = if (remuxVideoContainer) "mkv" else outputExtension
             val fileName = "${sanitizedTitle}.%(ext)s"
-            val finalFilePath = File(nosvedDir, "${sanitizedTitle}.${outputExtension}")
+            val finalFilePath = File(nosvedDir, "${sanitizedTitle}.${actualExtension}")
 
             val request = YoutubeDLRequest(downloadEntity.url)
             request.addOption("-o", File(nosvedDir, fileName).absolutePath)
             request.addOption("-f", "${videoFormat.formatId}+${audioFormat.formatId}/best")
-            request.addOption("--merge-output-format", outputExtension)
+
+            if (remuxVideoContainer) {
+                request.addOption("--remux-video", "mkv")
+                request.addOption("--merge-output-format", "mkv")
+            } else {
+                request.addOption("--merge-output-format", outputExtension)
+            }
+
             request.addOption(
                 "--user-agent",
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
@@ -177,11 +202,48 @@ class DownloadService(
                 request.addOption("--sponsorblock-remove", "all")
             }
 
-            if (downloadSubtitles) {
-                request.addOption("--write-subs")
-                request.addOption("--sub-lang", subtitleLang)
-                request.addOption("--embed-subs")
-                request.addOption("--convert-subs", "srt")
+            if (embedMetadata) {
+                request.addOption("--embed-metadata")
+                request.addOption("--embed-thumbnail")
+                request.addOption("--convert-thumbnails", "jpg")
+
+                if (cropArtwork) {
+                    try {
+                        val configFile = File(context.cacheDir, "crop_config_${downloadId}.txt")
+                        configFile.writeText("""--ppa "ffmpeg: -c:v mjpeg -vf crop=\"'if(gt(ih,iw),iw,ih)':'if(gt(iw,ih),ih,iw)'\"""""")
+                        request.addOption("--config", configFile.absolutePath)
+                    } catch (_: Exception) {}
+                }
+            }
+
+            val finalDownloadSubtitles = downloadSubtitles || downloadSubtitlesOption
+            val finalSubtitleLang = if (subtitleLang.isNotEmpty()) subtitleLang else subtitleLanguages
+
+            if (finalDownloadSubtitles) {
+                if (downloadAutoCaptions) {
+                    request.addOption("--write-auto-subs")
+                    if (!autoTranslatedSubtitles) {
+                        request.addOption("--extractor-args", "youtube:skip=translated_subs")
+                    }
+                }
+                if (finalSubtitleLang.isNotEmpty()) {
+                    request.addOption("--sub-langs", finalSubtitleLang)
+                }
+                if (embedSubtitles) {
+                    request.addOption("--embed-subs")
+                    if (keepSubtitleFiles) {
+                        request.addOption("--write-subs")
+                    }
+                } else {
+                    request.addOption("--write-subs")
+                }
+                if (convertSubtitles && subtitleFormat != "undefined" && subtitleFormat.isNotEmpty()) {
+                    request.addOption("--convert-subs", subtitleFormat)
+                }
+            }
+
+            if (formatSorting && sortingFields.isNotEmpty()) {
+                request.addOption("-S", sortingFields)
             }
 
             YoutubeDL.getInstance().execute(request) { progress, _, line ->
@@ -198,7 +260,7 @@ class DownloadService(
                         totalSize = downloadEntity.fileSize,
                         speed = extractSpeed(line),
                         eta = extractETA(line),
-                        taskDescription = taskDescription // Set the task description
+                        taskDescription = taskDescription
                     )
                     progressFlow.value = progressFlow.value + (downloadId to progressData)
                     repository.updateDownloadProgress(downloadId, progressData.progress, 0L)
@@ -221,7 +283,7 @@ class DownloadService(
                 downloadEntity.copy(
                     status = DownloadStatus.COMPLETED,
                     filePath = finalFilePath.absolutePath,
-                    fileName = "${sanitizedTitle}.${outputExtension}",
+                    fileName = "${sanitizedTitle}.${actualExtension}",
                     completedAt = System.currentTimeMillis(),
                     progress = 100,
                     error = null
@@ -233,7 +295,7 @@ class DownloadService(
                     notificationId,
                     downloadEntity.title,
                     finalFilePath.absolutePath,
-                    isAudioOnly = false // This is a video download
+                    isAudioOnly = false
                 )
             }
 
@@ -255,6 +317,12 @@ class DownloadService(
             if (incognitoMode) {
                 repository.deleteDownload(downloadId)
             }
+            try {
+                val configFile = File(context.cacheDir, "crop_config_${downloadId}.txt")
+                if (configFile.exists()) {
+                    configFile.delete()
+                }
+            } catch (_: Exception) {}
         }
     }
 
@@ -328,6 +396,20 @@ class DownloadService(
         val enableSponsorsBlock = prefs.getBoolean("enable_sponsors_block", false)
         val incognitoMode = prefs.getBoolean("incognito_mode", false)
 
+        val qualityPrefs = QualityPreferences(context)
+        val embedMetadata = qualityPrefs.embedMetadata.first()
+        val cropArtwork = qualityPrefs.cropArtwork.first()
+        val downloadSubtitlesOption = qualityPrefs.downloadSubtitles.first()
+        val subtitleLanguages = qualityPrefs.customSubtitleLanguages.first()
+        val convertSubtitles = qualityPrefs.convertSubtitles.first()
+        val subtitleFormat = qualityPrefs.subtitleFormat.first()
+        val downloadAutoCaptions = qualityPrefs.downloadAutoCaptions.first()
+        val autoTranslatedSubtitles = qualityPrefs.autoTranslatedSubtitles.first()
+        val formatSorting = qualityPrefs.formatSorting.first()
+        val sortingFields = qualityPrefs.sortingFields.first()
+        val convertAudioEnabled = qualityPrefs.convertAudioFormatEnabled.first()
+        val convertAudioFormat = qualityPrefs.convertAudioFormat.first()
+
         try {
             if (repository.getDownloadById(downloadId)?.status != DownloadStatus.DOWNLOADING) {
                 repository.updateDownloadStatus(downloadId, DownloadStatus.DOWNLOADING)
@@ -337,14 +419,15 @@ class DownloadService(
             val nosvedDir = File(downloadDir, "nosved")
             if (!nosvedDir.exists()) nosvedDir.mkdirs()
 
+            val targetAudioExtension = if (convertAudioEnabled) convertAudioFormat else audioExtension
             val fileName = "${sanitizedTitle}.%(ext)s"
-            val finalFilePath = File(nosvedDir, "${sanitizedTitle}.${audioExtension}")
+            val finalFilePath = File(nosvedDir, "${sanitizedTitle}.${targetAudioExtension}")
 
             val request = YoutubeDLRequest(downloadEntity.url)
             request.addOption("-o", File(nosvedDir, fileName).absolutePath)
             request.addOption("-f", audioFormat.formatId ?: "bestaudio")
             request.addOption("-x") // Extract audio
-            request.addOption("--audio-format", audioExtension)
+            request.addOption("--audio-format", targetAudioExtension)
             request.addOption("--no-warnings")
 
             if (detailedOutput) {
@@ -364,10 +447,41 @@ class DownloadService(
                 request.addOption("--sponsorblock-remove", "all")
             }
 
-            if (downloadSubtitles) {
+            if (embedMetadata) {
+                request.addOption("--embed-metadata")
+                request.addOption("--embed-thumbnail")
+                request.addOption("--convert-thumbnails", "jpg")
+
+                if (cropArtwork) {
+                    try {
+                        val configFile = File(context.cacheDir, "crop_config_${downloadId}.txt")
+                        configFile.writeText("""--ppa "ffmpeg: -c:v mjpeg -vf crop=\"'if(gt(ih,iw),iw,ih)':'if(gt(iw,ih),ih,iw)'\"""""")
+                        request.addOption("--config", configFile.absolutePath)
+                    } catch (_: Exception) {}
+                }
+            }
+
+            val finalDownloadSubtitles = downloadSubtitles || downloadSubtitlesOption
+            val finalSubtitleLang = if (subtitleLang.isNotEmpty()) subtitleLang else subtitleLanguages
+
+            if (finalDownloadSubtitles) {
+                if (downloadAutoCaptions) {
+                    request.addOption("--write-auto-subs")
+                    if (!autoTranslatedSubtitles) {
+                        request.addOption("--extractor-args", "youtube:skip=translated_subs")
+                    }
+                }
+                if (finalSubtitleLang.isNotEmpty()) {
+                    request.addOption("--sub-langs", finalSubtitleLang)
+                }
                 request.addOption("--write-subs")
-                request.addOption("--sub-lang", subtitleLang)
-                request.addOption("--convert-subs", "srt")
+                if (convertSubtitles && subtitleFormat != "undefined" && subtitleFormat.isNotEmpty()) {
+                    request.addOption("--convert-subs", subtitleFormat)
+                }
+            }
+
+            if (formatSorting && sortingFields.isNotEmpty()) {
+                request.addOption("-S", sortingFields)
             }
 
             YoutubeDL.getInstance().execute(request) { progress, _, line ->
@@ -384,7 +498,7 @@ class DownloadService(
                         totalSize = downloadEntity.fileSize,
                         speed = extractSpeed(line),
                         eta = extractETA(line),
-                        taskDescription = taskDescription // Set the task description
+                        taskDescription = taskDescription
                     )
                     progressFlow.value = progressFlow.value + (downloadId to progressData)
                     repository.updateDownloadProgress(downloadId, progressData.progress, 0L)
@@ -407,7 +521,7 @@ class DownloadService(
                 downloadEntity.copy(
                     status = DownloadStatus.COMPLETED,
                     filePath = finalFilePath.absolutePath,
-                    fileName = "${sanitizedTitle}.${audioExtension}",
+                    fileName = "${sanitizedTitle}.${targetAudioExtension}",
                     completedAt = System.currentTimeMillis(),
                     progress = 100,
                     error = null
@@ -419,7 +533,7 @@ class DownloadService(
                     notificationId,
                     downloadEntity.title,
                     finalFilePath.absolutePath,
-                    isAudioOnly = true // This is an audio download
+                    isAudioOnly = true
                 )
             }
 
@@ -441,6 +555,12 @@ class DownloadService(
             if (incognitoMode) {
                 repository.deleteDownload(downloadId)
             }
+            try {
+                val configFile = File(context.cacheDir, "crop_config_${downloadId}.txt")
+                if (configFile.exists()) {
+                    configFile.delete()
+                }
+            } catch (_: Exception) {}
         }
     }
 
