@@ -535,6 +535,17 @@ fun VideoInfoScreen(
                     showQualityDialog = false
                     onNavigateToFormatSelection()
                 },
+                onDownloadClick = {
+                    showQualityDialog = false
+                    viewModel.downloadVideoWithQuality(
+                        videoInfo = info,
+                        customTitle = customTitle,
+                        downloadMode = selectedDownloadMode,
+                        preferredVideoQuality = defaultVideoQuality,
+                        preferredAudioQuality = defaultAudioQuality
+                    )
+                    onBack()
+                },
                 onDismiss = { showQualityDialog = false }
             )
         }

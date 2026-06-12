@@ -90,6 +90,11 @@ class FormatSettingsViewModel(application: Application) : AndroidViewModel(appli
     val mergeMultipleAudio: StateFlow<Boolean> = qualityPrefs.mergeMultipleAudio
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
+    private val settingsRepo = com.devson.nosved.data.repository.SettingsRepository(application.applicationContext)
+
+    val downloadPlaylist: StateFlow<Boolean> = settingsRepo.downloadPlaylistFlow
+    val saveThumbnail: StateFlow<Boolean> = settingsRepo.saveThumbnailFlow
+
     fun setVideoQuality(quality: String) {
         viewModelScope.launch { qualityPrefs.setVideoQuality(quality) }
     }
@@ -188,6 +193,14 @@ class FormatSettingsViewModel(application: Application) : AndroidViewModel(appli
 
     fun setMergeMultipleAudio(enabled: Boolean) {
         viewModelScope.launch { qualityPrefs.setMergeMultipleAudio(enabled) }
+    }
+
+    fun setDownloadPlaylist(enabled: Boolean) {
+        viewModelScope.launch { settingsRepo.setDownloadPlaylist(enabled) }
+    }
+
+    fun setSaveThumbnail(enabled: Boolean) {
+        viewModelScope.launch { settingsRepo.setSaveThumbnail(enabled) }
     }
 
     fun getYtDlpVersion(): String {

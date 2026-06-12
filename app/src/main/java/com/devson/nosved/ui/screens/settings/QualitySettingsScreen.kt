@@ -54,6 +54,10 @@ fun QualitySettingsScreen(
     val clipVideo by viewModel.clipVideo.collectAsState()
     val mergeMultipleAudio by viewModel.mergeMultipleAudio.collectAsState()
 
+    val downloadPlaylist by viewModel.downloadPlaylist.collectAsState()
+    val saveThumbnail by viewModel.saveThumbnail.collectAsState()
+    val downloadSubtitles by viewModel.downloadSubtitles.collectAsState()
+
     // Dialog & Sheet States
     var showAudioFormatSheet by remember { mutableStateOf(false) }
     var showAudioQualitySheet by remember { mutableStateOf(false) }
@@ -575,6 +579,111 @@ fun QualitySettingsScreen(
                                 checked = mergeMultipleAudio,
                                 onCheckedChange = { viewModel.setMergeMultipleAudio(it) },
                                 enabled = formatSelection
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Additional Section
+            item {
+                Text(
+                    text = "Additional",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
+                )
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        // Download Playlist
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { viewModel.setDownloadPlaylist(!downloadPlaylist) },
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    "Download playlist",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Text(
+                                    "Download full playlist if URL contains one",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Switch(
+                                checked = downloadPlaylist,
+                                onCheckedChange = { viewModel.setDownloadPlaylist(it) }
+                            )
+                        }
+
+                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
+
+                        // Download Subtitles
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { viewModel.setDownloadSubtitles(!downloadSubtitles) },
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    "Download subtitles",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Text(
+                                    "Download subtitles for videos if available",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Switch(
+                                checked = downloadSubtitles,
+                                onCheckedChange = { viewModel.setDownloadSubtitles(it) }
+                            )
+                        }
+
+                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
+
+                        // Save Thumbnail
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { viewModel.setSaveThumbnail(!saveThumbnail) },
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    "Save thumbnail",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Text(
+                                    "Download video thumbnail file",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Switch(
+                                checked = saveThumbnail,
+                                onCheckedChange = { viewModel.setSaveThumbnail(it) }
                             )
                         }
                     }
