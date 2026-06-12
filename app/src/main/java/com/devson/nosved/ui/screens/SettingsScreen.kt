@@ -6,9 +6,16 @@ import android.net.Uri
 import android.os.Environment
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
@@ -66,7 +73,13 @@ fun SettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Settings") },
+                title = {
+                    Text(
+                        text = "Settings",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
@@ -88,115 +101,134 @@ fun SettingsScreen(
                 .fillMaxSize(),
             contentPadding = PaddingValues(
                 start = 16.dp,
-                top = 16.dp,
+                top = 0.dp,
                 end = 16.dp,
                 bottom = paddingValues.calculateBottomPadding() + 16.dp
-            ),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+            )
         ) {
             // General Section
             settingsSection("General") {
                 item {
-                    SettingsItem(
-                        icon = Icons.Default.Palette,
-                        title = "Appearance",
-                        subtitle = "Theme mode, colors, and navigation style",
-                        onClick = onNavigateToAppearanceSettings
-                    )
+                    SettingsGroupCard {
+                        SettingsItemRow(
+                            icon = Icons.Default.Palette,
+                            title = "Appearance",
+                            subtitle = "Theme mode, colors, and navigation style",
+                            onClick = onNavigateToAppearanceSettings
+                        )
+                    }
                 }
             }
 
             // Download Settings Section
             settingsSection("Download Settings") {
                 item {
-                    SettingsItem(
-                        icon = Icons.Default.Folder,
-                        title = "Download Location",
-                        subtitle = downloadFolder.substringAfterLast("/"),
-                        onClick = { dialogState = DialogState.DownloadLocation }
-                    )
-                }
-                item {
-                    SettingsItem(
-                        icon = Icons.Default.Tune,
-                        title = "Format Settings",
-                        subtitle = "Set default mode, formats, and quality",
-                        onClick = onNavigateToQualitySettings
-                    )
-                }
-                item {
-                    SettingsItem(
-                        icon = Icons.Default.Settings,
-                        title = "Advanced Settings",
-                        subtitle = "Subtitles, SponsorBlock, and more",
-                        onClick = onNavigateToAdvancedSettings
-                    )
+                    SettingsGroupCard {
+                        SettingsItemRow(
+                            icon = Icons.Default.Folder,
+                            title = "Download Location",
+                            subtitle = downloadFolder.substringAfterLast("/"),
+                            onClick = { dialogState = DialogState.DownloadLocation }
+                        )
+                        HorizontalDivider(
+                            modifier = Modifier.padding(start = 72.dp),
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                        )
+                        SettingsItemRow(
+                            icon = Icons.Default.Tune,
+                            title = "Format Settings",
+                            subtitle = "Set default mode, formats, and quality",
+                            onClick = onNavigateToQualitySettings
+                        )
+                        HorizontalDivider(
+                            modifier = Modifier.padding(start = 72.dp),
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                        )
+                        SettingsItemRow(
+                            icon = Icons.Default.Settings,
+                            title = "Advanced Settings",
+                            subtitle = "Subtitles, SponsorBlock, and more",
+                            onClick = onNavigateToAdvancedSettings
+                        )
+                    }
                 }
             }
 
             // Storage Section
             settingsSection("Storage") {
                 item {
-                    SettingsItem(
-                        icon = Icons.Default.Storage,
-                        title = "Storage Usage",
-                        subtitle = "Used: ${storageInfo.first} • Available: ${storageInfo.second}",
-                        onClick = { }
-                    )
-                }
-                item {
-                    SettingsItem(
-                        icon = Icons.Default.CleaningServices,
-                        title = "Clear Cache",
-                        subtitle = "Remove temporary files",
-                        onClick = {
-                            scope.launch {
-                                withContext(Dispatchers.IO) {
-                                    clearAppCache(context)
+                    SettingsGroupCard {
+                        SettingsItemRow(
+                            icon = Icons.Default.Storage,
+                            title = "Storage Usage",
+                            subtitle = "Used: ${storageInfo.first} • Available: ${storageInfo.second}",
+                            onClick = { }
+                        )
+                        HorizontalDivider(
+                            modifier = Modifier.padding(start = 72.dp),
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                        )
+                        SettingsItemRow(
+                            icon = Icons.Default.CleaningServices,
+                            title = "Clear Cache",
+                            subtitle = "Remove temporary files",
+                            onClick = {
+                                scope.launch {
+                                    withContext(Dispatchers.IO) {
+                                        clearAppCache(context)
+                                    }
+                                    storageInfo = withContext(Dispatchers.IO) {
+                                        getStorageInfoOptimized(context)
+                                    }
+                                    showToast(context, "Cache cleared!")
                                 }
-                                storageInfo = withContext(Dispatchers.IO) {
-                                    getStorageInfoOptimized(context)
-                                }
-                                showToast(context, "Cache cleared!")
                             }
-                        }
-                    )
+                        )
+                    }
                 }
             }
 
-            // About Section - Updated with App Version navigation
+            // About Section
             settingsSection("About") {
                 item {
-                    SettingsItem(
-                        icon = Icons.Default.Info,
-                        title = "App Version",
-                        subtitle = "Version info and updates",
-                        onClick = onNavigateToAppVersion // Navigate to new App Version screen
-                    )
-                }
-                item {
-                    SettingsItem(
-                        icon = Icons.Default.Favorite, // or Icons.Default.Stars
-                        title = "Credits",
-                        subtitle = "Acknowledgements and licenses",
-                        onClick = onNavigateToCredits // Add this new navigation
-                    )
-                }
-                item {
-                    SettingsItem(
-                        icon = Icons.Default.Code,
-                        title = "Official Repo",
-                        subtitle = "View on GitHub",
-                        onClick = { openGitHub(context) }
-                    )
-                }
-                item {
-                    SettingsItem(
-                        icon = Icons.Default.BugReport,
-                        title = "Report Issue",
-                        subtitle = "Found a bug? Let us know",
-                        onClick = { openIssueTracker(context) }
-                    )
+                    SettingsGroupCard {
+                        SettingsItemRow(
+                            icon = Icons.Default.Info,
+                            title = "App Version",
+                            subtitle = "Version info and updates",
+                            onClick = onNavigateToAppVersion
+                        )
+                        HorizontalDivider(
+                            modifier = Modifier.padding(start = 72.dp),
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                        )
+                        SettingsItemRow(
+                            icon = Icons.Default.Favorite,
+                            title = "Credits",
+                            subtitle = "Acknowledgements and licenses",
+                            onClick = onNavigateToCredits
+                        )
+                        HorizontalDivider(
+                            modifier = Modifier.padding(start = 72.dp),
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                        )
+                        SettingsItemRow(
+                            icon = Icons.Default.Code,
+                            title = "Official Repo",
+                            subtitle = "View on GitHub",
+                            onClick = { openGitHub(context) }
+                        )
+                        HorizontalDivider(
+                            modifier = Modifier.padding(start = 72.dp),
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                        )
+                        SettingsItemRow(
+                            icon = Icons.Default.BugReport,
+                            title = "Report Issue",
+                            subtitle = "Found a bug? Let us know",
+                            onClick = { openIssueTracker(context) }
+                        )
+                    }
                 }
             }
         }
@@ -227,6 +259,7 @@ fun SettingsScreen(
         }
     }
 }
+
 fun LazyListScope.settingsSection(
     title: String,
     content: LazyListScope.() -> Unit
@@ -234,59 +267,90 @@ fun LazyListScope.settingsSection(
     item {
         Text(
             text = title,
-            style = MaterialTheme.typography.titleMedium,
+            style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp)
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(start = 8.dp, top = 16.dp, bottom = 8.dp)
         )
     }
     content()
     item {
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(12.dp))
     }
 }
 
 @Composable
-fun SettingsItem(
+fun SettingsGroupCard(
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(20.dp)),
+            content = content
+        )
+    }
+}
+
+@Composable
+fun SettingsItemRow(
     icon: ImageVector,
     title: String,
     subtitle: String,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    Card(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth()
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Row(
+        Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .size(40.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.secondaryContainer),
+            contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(20.dp)
-            )
-            Spacer(modifier = Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.bodyLarge
-                )
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            Icon(
-                imageVector = Icons.Default.ChevronRight,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(16.dp)
+                modifier = Modifier.size(20.dp),
+                tint = MaterialTheme.colorScheme.onSecondaryContainer
             )
         }
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        Icon(
+            imageVector = Icons.Default.ChevronRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(20.dp)
+        )
     }
 }
 
@@ -300,45 +364,91 @@ fun DownloadFolderDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Download Folder") },
+        icon = {
+            Icon(
+                Icons.Filled.FolderOpen,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(32.dp)
+            )
+        },
+        title = {
+            Text(
+                text = "Download Folder",
+                style = MaterialTheme.typography.headlineSmall,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+        },
         text = {
-            Column {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        Icons.Filled.FolderOpen,
-                        contentDescription = null,
-                        modifier = Modifier.size(24.dp),
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(Modifier.width(8.dp))
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "Current location:",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Surface(
+                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
                     Text(
-                        downloadFolder.substringAfterLast("/"),
-                        style = MaterialTheme.typography.bodyMedium
+                        text = downloadFolder.substringAfterLast("/"),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                     )
                 }
-
-                Spacer(Modifier.height(16.dp))
-
+            }
+        },
+        confirmButton = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 Button(
                     onClick = onChooseFolder,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
                 ) {
                     Text("Choose Folder")
                 }
 
                 Row(
-                    Modifier.fillMaxWidth().padding(top = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceEvenly
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    TextButton(onClick = onResetFolder) { Text("Reset") }
-                    TextButton(onClick = onOpenFolder) { Text("Open") }
+                    OutlinedButton(
+                        onClick = onResetFolder,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("Reset")
+                    }
+                    OutlinedButton(
+                        onClick = onOpenFolder,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("Open")
+                    }
+                }
+
+                TextButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Close")
                 }
             }
         },
-        confirmButton = {},
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Close") }
-        }
+        shape = RoundedCornerShape(28.dp),
+        containerColor = MaterialTheme.colorScheme.surface,
+        tonalElevation = 6.dp
     )
 }
 

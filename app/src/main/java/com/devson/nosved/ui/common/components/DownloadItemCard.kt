@@ -55,47 +55,50 @@ fun DownloadItemCard(
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .combinedClickable(
-                onClick = {
-                    if (isInSelectionMode) {
-                        onToggleSelection()
-                    } else {
-                        if (isPlayable) {
-                            val file = File(download.filePath!!)
-                            if (file.exists()) {
-                                onAction(DownloadAction.Play(download.filePath!!))
-                            } else {
-                                dialogTitle = "File Not Found"
-                                dialogMessage = "The downloaded file has been deleted or moved from your device storage."
-                                showOptionsDialog = true
-                            }
-                        } else if (isFailedOrCancelled) {
-                            dialogTitle = if (download.status == DownloadStatus.FAILED) "Download Failed" else "Download Cancelled"
-                            dialogMessage = if (download.status == DownloadStatus.FAILED) {
-                                "The download failed due to an error:\n${download.error ?: "Unknown error"}"
-                            } else {
-                                "The download was cancelled before completion."
-                            }
-                            showOptionsDialog = true
-                        }
-                    }
-                },
-                onLongClick = {
-                    onToggleSelection()
-                }
-            ),
+            .padding(horizontal = 16.dp, vertical = 8.dp),
         elevation = CardDefaults.cardElevation(
-            defaultElevation = 2.dp,
-            pressedElevation = 4.dp
+            defaultElevation = 4.dp,
+            pressedElevation = 6.dp
         ),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerLow
         )
     ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(20.dp))
+                .combinedClickable(
+                    onClick = {
+                        if (isInSelectionMode) {
+                            onToggleSelection()
+                        } else {
+                            if (isPlayable) {
+                                val file = File(download.filePath!!)
+                                if (file.exists()) {
+                                    onAction(DownloadAction.Play(download.filePath!!))
+                                } else {
+                                    dialogTitle = "File Not Found"
+                                    dialogMessage = "The downloaded file has been deleted or moved from your device storage."
+                                    showOptionsDialog = true
+                                }
+                            } else if (isFailedOrCancelled) {
+                                dialogTitle = if (download.status == DownloadStatus.FAILED) "Download Failed" else "Download Cancelled"
+                                dialogMessage = if (download.status == DownloadStatus.FAILED) {
+                                    "The download failed due to an error:\n${download.error ?: "Unknown error"}"
+                                } else {
+                                    "The download was cancelled before completion."
+                                }
+                                showOptionsDialog = true
+                            }
+                        }
+                    },
+                    onLongClick = {
+                        onToggleSelection()
+                    }
+                )
+        ) {
             // Thumbnail container with status badge overlay
             Box(
                 modifier = Modifier

@@ -180,7 +180,7 @@ fun FormatSelectionScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
 
-            // ── Video Preview Header ──────────────────────────────────────────────
+            //  Video Preview Header 
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -244,7 +244,7 @@ fun FormatSelectionScreen(
                 }
             }
 
-            // ── Subtitle Languages ────────────────────────────────────────────────
+            //  Subtitle Languages 
             item {
                 Row(
                     modifier = Modifier
@@ -288,13 +288,13 @@ fun FormatSelectionScreen(
                 }
             }
 
-            // ── Selected Section ──────────────────────────────────────────────────
+            //  Selected Section 
             if (selectedVideo != null || selectedAudio != null) {
                 item { FssSectionTitle("Selected") }
                 item { FssSelectedFormatsTile(video = selectedVideo, audio = selectedAudio) }
             }
 
-            // ── Suggested Section ─────────────────────────────────────────────────
+            //  Suggested Section 
             if (groups.suggested.isNotEmpty()) {
                 item { FssSectionTitle("Suggested") }
                 items(groups.suggested) { s ->
@@ -310,7 +310,7 @@ fun FormatSelectionScreen(
                 }
             }
 
-            // ── Audio Section ─────────────────────────────────────────────────────
+            //  Audio Section 
             if (groups.audioOnly.isNotEmpty()) {
                 item { FssSectionTitle("Audio") }
                 val audioChunks = groups.audioOnly.chunked(2)
@@ -335,7 +335,7 @@ fun FormatSelectionScreen(
                 }
             }
 
-            // ── Video (No Audio) Section ──────────────────────────────────────────
+            //  Video (No Audio) Section 
             if (groups.videoOnly.isNotEmpty()) {
                 item {
                     Row(
@@ -381,7 +381,7 @@ fun FormatSelectionScreen(
                 }
             }
 
-            // ── Mixed (Video + Audio) Section ─────────────────────────────────────
+            //  Mixed (Video + Audio) Section 
             if (groups.mixed.isNotEmpty()) {
                 item { FssSectionTitle("Video") }
                 items(groups.mixed.chunked(2)) { chunk ->
@@ -405,7 +405,7 @@ fun FormatSelectionScreen(
                 }
             }
 
-            // ── Info Disclaimer ───────────────────────────────────────────────────
+            //  Info Disclaimer 
             item {
                 Card(
                     modifier = Modifier
@@ -444,7 +444,7 @@ fun FormatSelectionScreen(
     }
 }
 
-// ── Private helper composables ────────────────────────────────────────────────
+//  Private helper composables 
 
 @Composable
 private fun FssSectionTitle(text: String) {
@@ -676,7 +676,7 @@ private fun FssMixedTile(fmt: VideoFormat, isSelected: Boolean, onClick: () -> U
     }
 }
 
-// ── Private pure helper functions ─────────────────────────────────────────────
+//  Private pure helper functions 
 
 private fun fssGetAudioLabel(fmt: VideoFormat): String {
     val abr = fmt.abr ?: fmt.tbr ?: return ""

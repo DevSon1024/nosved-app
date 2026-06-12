@@ -163,7 +163,7 @@ fun QualitySettingsScreen(
                                     fontWeight = FontWeight.Medium
                                 )
                                 Text(
-                                    text = audioContainer.uppercase(),
+                                    text = audioContainer,
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
