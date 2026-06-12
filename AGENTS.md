@@ -9,6 +9,7 @@ This document is the absolute source of truth for any AI agent or LLM assisting 
 - **Zero Blabbering / Conversational Fluff:** Avoid long explanations, explanations of standard APIs, or conversational pleasantries.
 - **Concise Chat Explanations:** Explain what you did in **1-2 sentences maximum** before/after a code block. Focus entirely on the code.
 - **Direct Code Delivery:** Present complete, functional code blocks directly rather than describing step-by-step how to write it.
+- **code implementation** when the code is added to the code files do not usse '─' anywhere specially claude agents should not use it
 
 ---
 
