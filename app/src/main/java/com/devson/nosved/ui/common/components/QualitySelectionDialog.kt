@@ -52,7 +52,7 @@ fun QualitySelectionDialog(
     val downloadSubtitles by qualityPrefs.downloadSubtitles.collectAsState(initial = false)
 
     val sharedPrefs = remember { context.getSharedPreferences("app_settings", android.content.Context.MODE_PRIVATE) }
-    var downloadPlaylist by remember { mutableStateOf(sharedPrefs.getBoolean("download_playlist", true)) }
+    var downloadPlaylist by remember { mutableStateOf(sharedPrefs.getBoolean("download_playlist", false)) }
     var saveThumbnail by remember { mutableStateOf(sharedPrefs.getBoolean("save_thumbnail", true)) }
 
     // Dialog states

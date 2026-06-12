@@ -62,7 +62,7 @@ class SettingsRepository(context: Context) {
     val disablePreviewFlow: StateFlow<Boolean> = _disablePreviewFlow.asStateFlow()
 
     // Advanced settings configurations
-    private val _downloadPlaylistFlow = MutableStateFlow(prefs.getBoolean("download_playlist", true))
+    private val _downloadPlaylistFlow = MutableStateFlow(prefs.getBoolean("download_playlist", false))
     val downloadPlaylistFlow: StateFlow<Boolean> = _downloadPlaylistFlow.asStateFlow()
 
     private val _downloadArchiveFlow = MutableStateFlow(prefs.getBoolean("download_archive", false))
@@ -117,7 +117,7 @@ class SettingsRepository(context: Context) {
                 _disablePreviewFlow.value = prefs.getBoolean("disable_preview", false)
             }
             "download_playlist" -> {
-                _downloadPlaylistFlow.value = prefs.getBoolean("download_playlist", true)
+                _downloadPlaylistFlow.value = prefs.getBoolean("download_playlist", false)
             }
             "download_archive" -> {
                 _downloadArchiveFlow.value = prefs.getBoolean("download_archive", false)

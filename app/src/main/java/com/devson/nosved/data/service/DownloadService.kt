@@ -67,6 +67,7 @@ class DownloadService(
      * inserts it into the repository, and starts the download execution.
      */
     suspend fun startVideoDownload(
+        url: String,
         videoInfo: VideoInfo,
         videoFormat: VideoFormat,
         audioFormat: VideoFormat,
@@ -87,7 +88,7 @@ class DownloadService(
         val downloadEntity = DownloadEntity(
             id = downloadId,
             title = titleToUse,
-            url = videoInfo.webpageUrl ?: "",
+            url = url,
             thumbnail = thumbnailUrl, // Use compressed thumbnail URL
             filePath = null,
             fileName = null,
@@ -131,7 +132,7 @@ class DownloadService(
         val isNotificationEnabled = prefs.getBoolean("download_notification_enabled", true)
         val detailedOutput = prefs.getBoolean("detailed_output", false)
         val saveThumbnail = prefs.getBoolean("save_thumbnail", true)
-        val downloadPlaylist = prefs.getBoolean("download_playlist", true)
+        val downloadPlaylist = prefs.getBoolean("download_playlist", false)
         val downloadArchive = prefs.getBoolean("download_archive", false)
         val enableSponsorsBlock = prefs.getBoolean("enable_sponsors_block", false)
         val incognitoMode = prefs.getBoolean("incognito_mode", false)
@@ -150,6 +151,8 @@ class DownloadService(
         val keepSubtitleFiles = qualityPrefs.keepSubtitleFiles.first()
         val formatSorting = qualityPrefs.formatSorting.first()
         val sortingFields = qualityPrefs.sortingFields.first()
+        val preferredVideoQuality = qualityPrefs.videoQuality.first()
+        val preferredVideoContainer = qualityPrefs.videoContainer.first().lowercase()
 
         try {
             if (repository.getDownloadById(downloadId)?.status != DownloadStatus.DOWNLOADING) {
@@ -166,7 +169,20 @@ class DownloadService(
 
             val request = YoutubeDLRequest(downloadEntity.url)
             request.addOption("-o", File(nosvedDir, fileName).absolutePath)
-            request.addOption("-f", "${videoFormat.formatId}+${audioFormat.formatId}/best")
+
+            val isPlaylist = isPlaylistUrl(downloadEntity.url)
+            val formatStr = if (isPlaylist && downloadPlaylist) {
+                val height = parseQualityFromString(preferredVideoQuality)
+                val ext = if (preferredVideoContainer == "mp4" || preferredVideoContainer == "legacy") "mp4" else "webm"
+                if (ext == "mp4") {
+                    "bestvideo[height<=$height][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=$height]+bestaudio/best"
+                } else {
+                    "bestvideo[height<=$height]+bestaudio/best"
+                }
+            } else {
+                "${videoFormat.formatId}+${audioFormat.formatId}/best"
+            }
+            request.addOption("-f", formatStr)
 
             if (remuxVideoContainer) {
                 request.addOption("--remux-video", "mkv")
@@ -331,6 +347,7 @@ class DownloadService(
      * inserts it into the repository, and starts the download execution.
      */
     suspend fun startAudioDownload(
+        url: String,
         videoInfo: VideoInfo,
         audioFormat: VideoFormat,
         customTitle: String,
@@ -349,7 +366,7 @@ class DownloadService(
         val downloadEntity = DownloadEntity(
             id = downloadId,
             title = "${titleToUse} (Audio)",
-            url = videoInfo.webpageUrl ?: "",
+            url = url,
             thumbnail = thumbnailUrl, // Use compressed thumbnail URL
             filePath = null,
             fileName = null,
@@ -391,7 +408,7 @@ class DownloadService(
         val isNotificationEnabled = prefs.getBoolean("download_notification_enabled", true)
         val detailedOutput = prefs.getBoolean("detailed_output", false)
         val saveThumbnail = prefs.getBoolean("save_thumbnail", true)
-        val downloadPlaylist = prefs.getBoolean("download_playlist", true)
+        val downloadPlaylist = prefs.getBoolean("download_playlist", false)
         val downloadArchive = prefs.getBoolean("download_archive", false)
         val enableSponsorsBlock = prefs.getBoolean("enable_sponsors_block", false)
         val incognitoMode = prefs.getBoolean("incognito_mode", false)
@@ -409,6 +426,8 @@ class DownloadService(
         val sortingFields = qualityPrefs.sortingFields.first()
         val convertAudioEnabled = qualityPrefs.convertAudioFormatEnabled.first()
         val convertAudioFormat = qualityPrefs.convertAudioFormat.first()
+        val preferredAudioQuality = qualityPrefs.audioQuality.first()
+        val preferredAudioContainer = qualityPrefs.audioContainer.first().lowercase()
 
         try {
             if (repository.getDownloadById(downloadId)?.status != DownloadStatus.DOWNLOADING) {
@@ -425,7 +444,16 @@ class DownloadService(
 
             val request = YoutubeDLRequest(downloadEntity.url)
             request.addOption("-o", File(nosvedDir, fileName).absolutePath)
-            request.addOption("-f", audioFormat.formatId ?: "bestaudio")
+
+            val isPlaylist = isPlaylistUrl(downloadEntity.url)
+            val formatStr = if (isPlaylist && downloadPlaylist) {
+                val bitrate = parseQualityFromString(preferredAudioQuality)
+                val ext = if (preferredAudioContainer == "m4a") "m4a" else "webm"
+                "bestaudio[abr<=$bitrate][ext=$ext]/bestaudio[abr<=$bitrate]/bestaudio"
+            } else {
+                audioFormat.formatId ?: "bestaudio"
+            }
+            request.addOption("-f", formatStr)
             request.addOption("-x") // Extract audio
             request.addOption("--audio-format", targetAudioExtension)
             request.addOption("--no-warnings")
@@ -794,5 +822,11 @@ class DownloadService(
         coroutineScope.launch(Dispatchers.Main) {
             Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
         }
+    }
+
+    private fun isPlaylistUrl(url: String): Boolean {
+        val trimmed = url.trim()
+        return trimmed.contains("list=", ignoreCase = true) || 
+               trimmed.contains("/playlist", ignoreCase = true)
     }
 }

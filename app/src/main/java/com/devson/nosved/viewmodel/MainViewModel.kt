@@ -164,6 +164,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                         val subtitleLang = qualityPrefs.customSubtitleLanguages.first()
 
                                         downloadVideoWithQuality(
+                                            url = url,
                                             videoInfo = info,
                                             customTitle = "",
                                             downloadMode = mode,
@@ -281,6 +282,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // --- Download Control Functions (Delegating to Service) ---
 
     fun downloadVideoWithQuality(
+        url: String,
         videoInfo: VideoInfo,
         customTitle: String,
         downloadMode: DownloadMode,
@@ -304,7 +306,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
                     if (selectedAudio != null) {
                         downloadService.startAudioDownload(
-                            videoInfo, selectedAudio, customTitle, downloadSubtitles, subtitleLang
+                            url, videoInfo, selectedAudio, customTitle, downloadSubtitles, subtitleLang
                         )
                         _selectedAudioFormat.value = selectedAudio
                         _selectedVideoFormat.value = null
@@ -318,7 +320,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
                     if (selectedVideo != null && selectedAudio != null) {
                         downloadService.startVideoDownload(
-                            videoInfo, selectedVideo, selectedAudio, customTitle, downloadSubtitles, subtitleLang
+                            url, videoInfo, selectedVideo, selectedAudio, customTitle, downloadSubtitles, subtitleLang
                         )
                         _selectedVideoFormat.value = selectedVideo
                         _selectedAudioFormat.value = selectedAudio
@@ -332,7 +334,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun downloadVideo(videoInfo: VideoInfo, videoFormat: VideoFormat, audioFormat: VideoFormat, customTitle: String) {
         viewModelScope.launch (Dispatchers.IO) {
             downloadService.startVideoDownload(
-                videoInfo, videoFormat, audioFormat, customTitle, false, ""
+                videoInfo.webpageUrl ?: "", videoInfo, videoFormat, audioFormat, customTitle, false, ""
             )
         }
     }
@@ -451,6 +453,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                     val subtitleLang = qualityPrefs.customSubtitleLanguages.first()
 
                                     downloadVideoWithQuality(
+                                        url = url,
                                         videoInfo = info,
                                         customTitle = "",
                                         downloadMode = mode,

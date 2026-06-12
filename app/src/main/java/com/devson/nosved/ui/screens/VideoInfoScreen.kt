@@ -146,6 +146,7 @@ fun VideoInfoScreen(
                         Button(
                             onClick = {
                                 viewModel.downloadVideoWithQuality(
+                                    url = viewModel.currentUrl.value,
                                     videoInfo = info,
                                     customTitle = customTitle,
                                     downloadMode = selectedDownloadMode,
@@ -538,6 +539,7 @@ fun VideoInfoScreen(
                 onDownloadClick = {
                     showQualityDialog = false
                     viewModel.downloadVideoWithQuality(
+                        url = viewModel.currentUrl.value,
                         videoInfo = info,
                         customTitle = customTitle,
                         downloadMode = selectedDownloadMode,
