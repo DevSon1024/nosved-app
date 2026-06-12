@@ -105,6 +105,7 @@ class DownloadService(
 
         executeVideoDownload(
             downloadEntity,
+            videoInfo,
             videoFormat,
             audioFormat,
             sanitizedTitle,
@@ -119,6 +120,7 @@ class DownloadService(
      */
     private suspend fun executeVideoDownload(
         downloadEntity: DownloadEntity,
+        videoInfo: VideoInfo,
         videoFormat: VideoFormat,
         audioFormat: VideoFormat,
         sanitizedTitle: String,
@@ -136,7 +138,7 @@ class DownloadService(
         val downloadArchive = prefs.getBoolean("download_archive", false)
         val enableSponsorsBlock = prefs.getBoolean("enable_sponsors_block", false)
         val incognitoMode = prefs.getBoolean("incognito_mode", false)
-
+ 
         val qualityPrefs = QualityPreferences(context)
         val embedMetadata = qualityPrefs.embedMetadata.first()
         val cropArtwork = qualityPrefs.cropArtwork.first()
@@ -153,23 +155,26 @@ class DownloadService(
         val sortingFields = qualityPrefs.sortingFields.first()
         val preferredVideoQuality = qualityPrefs.videoQuality.first()
         val preferredVideoContainer = qualityPrefs.videoContainer.first().lowercase()
-
+ 
+        val restrictFilenames = prefs.getBoolean("restrict_filenames", false)
+        val template = prefs.getString("output_template", "%(title).200B.%(ext)s") ?: "%(title).200B.%(ext)s"
+ 
         try {
             if (repository.getDownloadById(downloadId)?.status != DownloadStatus.DOWNLOADING) {
                 repository.updateDownloadStatus(downloadId, DownloadStatus.DOWNLOADING)
             }
-            val downloadDir =
-                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-            val nosvedDir = File(downloadDir, "nosved")
-            if (!nosvedDir.exists()) nosvedDir.mkdirs()
-
+            val nosvedDir = getTargetDir(downloadEntity.url, videoInfo, isAudioOnly = false, prefs = prefs)
+ 
             val actualExtension = if (remuxVideoContainer) "mkv" else outputExtension
-            val fileName = "${sanitizedTitle}.%(ext)s"
             val finalFilePath = File(nosvedDir, "${sanitizedTitle}.${actualExtension}")
-
+ 
             val request = YoutubeDLRequest(downloadEntity.url)
-            request.addOption("-o", File(nosvedDir, fileName).absolutePath)
-
+            request.addOption("-o", File(nosvedDir, template).absolutePath)
+ 
+            if (restrictFilenames) {
+                request.addOption("--restrict-filenames")
+            }
+ 
             val isPlaylist = isPlaylistUrl(downloadEntity.url)
             val formatStr = if (isPlaylist && downloadPlaylist) {
                 val height = parseQualityFromString(preferredVideoQuality)
@@ -183,14 +188,14 @@ class DownloadService(
                 "${videoFormat.formatId}+${audioFormat.formatId}/best"
             }
             request.addOption("-f", formatStr)
-
+ 
             if (remuxVideoContainer) {
                 request.addOption("--remux-video", "mkv")
                 request.addOption("--merge-output-format", "mkv")
             } else {
                 request.addOption("--merge-output-format", outputExtension)
             }
-
+ 
             request.addOption(
                 "--user-agent",
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
@@ -200,7 +205,7 @@ class DownloadService(
             request.addOption("--socket-timeout", "10")
             request.addOption("--retries", "3")
             request.addOption("--fragment-retries", "3")
-
+ 
             if (detailedOutput) {
                 request.addOption("-v")
             }
@@ -217,12 +222,12 @@ class DownloadService(
             if (enableSponsorsBlock) {
                 request.addOption("--sponsorblock-remove", "all")
             }
-
+ 
             if (embedMetadata) {
                 request.addOption("--embed-metadata")
                 request.addOption("--embed-thumbnail")
                 request.addOption("--convert-thumbnails", "jpg")
-
+ 
                 if (cropArtwork) {
                     try {
                         val configFile = File(context.cacheDir, "crop_config_${downloadId}.txt")
@@ -231,10 +236,10 @@ class DownloadService(
                     } catch (_: Exception) {}
                 }
             }
-
+ 
             val finalDownloadSubtitles = downloadSubtitles || downloadSubtitlesOption
             val finalSubtitleLang = if (subtitleLang.isNotEmpty()) subtitleLang else subtitleLanguages
-
+ 
             if (finalDownloadSubtitles) {
                 if (downloadAutoCaptions) {
                     request.addOption("--write-auto-subs")
@@ -257,18 +262,24 @@ class DownloadService(
                     request.addOption("--convert-subs", subtitleFormat)
                 }
             }
-
+ 
             if (formatSorting && sortingFields.isNotEmpty()) {
                 request.addOption("-S", sortingFields)
             }
-
+ 
+            var capturedFilePath: String? = null
+ 
             YoutubeDL.getInstance().execute(request) { progress, _, line ->
                 coroutineScope.launch(Dispatchers.IO) {
+                    val path = extractDestinationPath(line)
+                    if (path != null) {
+                        capturedFilePath = path
+                    }
                     val newDescription = parseTaskDescription(line)
                     val oldProgress = progressFlow.value[downloadId]
                     val taskDescription =
                         newDescription ?: oldProgress?.taskDescription ?: "Downloading..."
-
+ 
                     val progressData = DownloadProgress(
                         id = downloadId,
                         progress = if (progress > 0) progress.toInt() else 0,
@@ -289,17 +300,30 @@ class DownloadService(
                     }
                 }
             }
-
+ 
             if (repository.getDownloadById(downloadId)?.status == DownloadStatus.CANCELLED) {
                 notificationHelper.cancelNotification(notificationId)
                 return@withContext
             }
-
+ 
+            val resolvedFilePath = if (!capturedFilePath.isNullOrBlank()) {
+                File(capturedFilePath!!)
+            } else {
+                val ext = if (remuxVideoContainer) "mkv" else outputExtension
+                val evaluatedName = template
+                    .replace("%(title).200B", sanitizedTitle)
+                    .replace("%(title)s", sanitizedTitle)
+                    .replace("%(ext)s", ext)
+                    .replace("%(id)s", downloadEntity.id)
+                    .replace(Regex("%\\(\\w+\\)(?:\\.\\d+B)?s"), "")
+                File(nosvedDir, evaluatedName)
+            }
+ 
             repository.updateDownload(
                 downloadEntity.copy(
                     status = DownloadStatus.COMPLETED,
-                    filePath = finalFilePath.absolutePath,
-                    fileName = "${sanitizedTitle}.${actualExtension}",
+                    filePath = resolvedFilePath.absolutePath,
+                    fileName = resolvedFilePath.name,
                     completedAt = System.currentTimeMillis(),
                     progress = 100,
                     error = null
@@ -310,11 +334,11 @@ class DownloadService(
                 notificationHelper.showDownloadCompleteNotification(
                     notificationId,
                     downloadEntity.title,
-                    finalFilePath.absolutePath,
+                    resolvedFilePath.absolutePath,
                     isAudioOnly = false
                 )
             }
-
+ 
         } catch (e: Exception) {
             if (repository.getDownloadById(downloadId)?.status == DownloadStatus.CANCELLED) {
                 showToast("Download cancelled: ${downloadEntity.title}")
@@ -383,6 +407,7 @@ class DownloadService(
 
         executeAudioDownload(
             downloadEntity,
+            videoInfo,
             audioFormat,
             sanitizedTitle,
             audioExtension,
@@ -396,6 +421,7 @@ class DownloadService(
      */
     private suspend fun executeAudioDownload(
         downloadEntity: DownloadEntity,
+        videoInfo: VideoInfo,
         audioFormat: VideoFormat,
         sanitizedTitle: String,
         audioExtension: String,
@@ -412,7 +438,7 @@ class DownloadService(
         val downloadArchive = prefs.getBoolean("download_archive", false)
         val enableSponsorsBlock = prefs.getBoolean("enable_sponsors_block", false)
         val incognitoMode = prefs.getBoolean("incognito_mode", false)
-
+ 
         val qualityPrefs = QualityPreferences(context)
         val embedMetadata = qualityPrefs.embedMetadata.first()
         val cropArtwork = qualityPrefs.cropArtwork.first()
@@ -428,23 +454,26 @@ class DownloadService(
         val convertAudioFormat = qualityPrefs.convertAudioFormat.first()
         val preferredAudioQuality = qualityPrefs.audioQuality.first()
         val preferredAudioContainer = qualityPrefs.audioContainer.first().lowercase()
-
+ 
+        val restrictFilenames = prefs.getBoolean("restrict_filenames", false)
+        val template = prefs.getString("output_template", "%(title).200B.%(ext)s") ?: "%(title).200B.%(ext)s"
+ 
         try {
             if (repository.getDownloadById(downloadId)?.status != DownloadStatus.DOWNLOADING) {
                 repository.updateDownloadStatus(downloadId, DownloadStatus.DOWNLOADING)
             }
-            val downloadDir =
-                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-            val nosvedDir = File(downloadDir, "nosved")
-            if (!nosvedDir.exists()) nosvedDir.mkdirs()
-
+            val nosvedDir = getTargetDir(downloadEntity.url, videoInfo, isAudioOnly = true, prefs = prefs)
+ 
             val targetAudioExtension = if (convertAudioEnabled) convertAudioFormat else audioExtension
-            val fileName = "${sanitizedTitle}.%(ext)s"
             val finalFilePath = File(nosvedDir, "${sanitizedTitle}.${targetAudioExtension}")
-
+ 
             val request = YoutubeDLRequest(downloadEntity.url)
-            request.addOption("-o", File(nosvedDir, fileName).absolutePath)
-
+            request.addOption("-o", File(nosvedDir, template).absolutePath)
+ 
+            if (restrictFilenames) {
+                request.addOption("--restrict-filenames")
+            }
+ 
             val isPlaylist = isPlaylistUrl(downloadEntity.url)
             val formatStr = if (isPlaylist && downloadPlaylist) {
                 val bitrate = parseQualityFromString(preferredAudioQuality)
@@ -457,7 +486,7 @@ class DownloadService(
             request.addOption("-x") // Extract audio
             request.addOption("--audio-format", targetAudioExtension)
             request.addOption("--no-warnings")
-
+ 
             if (detailedOutput) {
                 request.addOption("-v")
             }
@@ -474,12 +503,12 @@ class DownloadService(
             if (enableSponsorsBlock) {
                 request.addOption("--sponsorblock-remove", "all")
             }
-
+ 
             if (embedMetadata) {
                 request.addOption("--embed-metadata")
                 request.addOption("--embed-thumbnail")
                 request.addOption("--convert-thumbnails", "jpg")
-
+ 
                 if (cropArtwork) {
                     try {
                         val configFile = File(context.cacheDir, "crop_config_${downloadId}.txt")
@@ -488,10 +517,10 @@ class DownloadService(
                     } catch (_: Exception) {}
                 }
             }
-
+ 
             val finalDownloadSubtitles = downloadSubtitles || downloadSubtitlesOption
             val finalSubtitleLang = if (subtitleLang.isNotEmpty()) subtitleLang else subtitleLanguages
-
+ 
             if (finalDownloadSubtitles) {
                 if (downloadAutoCaptions) {
                     request.addOption("--write-auto-subs")
@@ -507,18 +536,24 @@ class DownloadService(
                     request.addOption("--convert-subs", subtitleFormat)
                 }
             }
-
+ 
             if (formatSorting && sortingFields.isNotEmpty()) {
                 request.addOption("-S", sortingFields)
             }
-
+ 
+            var capturedFilePath: String? = null
+ 
             YoutubeDL.getInstance().execute(request) { progress, _, line ->
                 coroutineScope.launch(Dispatchers.IO) {
+                    val path = extractDestinationPath(line)
+                    if (path != null) {
+                        capturedFilePath = path
+                    }
                     val newDescription = parseTaskDescription(line)
                     val oldProgress = progressFlow.value[downloadId]
                     val taskDescription =
                         newDescription ?: oldProgress?.taskDescription ?: "Downloading audio..."
-
+ 
                     val progressData = DownloadProgress(
                         id = downloadId,
                         progress = if (progress > 0) progress.toInt() else 0,
@@ -539,17 +574,30 @@ class DownloadService(
                     }
                 }
             }
-
+ 
             if (repository.getDownloadById(downloadId)?.status == DownloadStatus.CANCELLED) {
                 notificationHelper.cancelNotification(notificationId)
                 return@withContext
             }
-
+ 
+            val resolvedFilePath = if (!capturedFilePath.isNullOrBlank()) {
+                File(capturedFilePath!!)
+            } else {
+                val ext = if (convertAudioEnabled) convertAudioFormat else audioExtension
+                val evaluatedName = template
+                    .replace("%(title).200B", sanitizedTitle)
+                    .replace("%(title)s", sanitizedTitle)
+                    .replace("%(ext)s", ext)
+                    .replace("%(id)s", downloadEntity.id)
+                    .replace(Regex("%\\(\\w+\\)(?:\\.\\d+B)?s"), "")
+                File(nosvedDir, evaluatedName)
+            }
+ 
             repository.updateDownload(
                 downloadEntity.copy(
                     status = DownloadStatus.COMPLETED,
-                    filePath = finalFilePath.absolutePath,
-                    fileName = "${sanitizedTitle}.${targetAudioExtension}",
+                    filePath = resolvedFilePath.absolutePath,
+                    fileName = resolvedFilePath.name,
                     completedAt = System.currentTimeMillis(),
                     progress = 100,
                     error = null
@@ -560,11 +608,11 @@ class DownloadService(
                 notificationHelper.showDownloadCompleteNotification(
                     notificationId,
                     downloadEntity.title,
-                    finalFilePath.absolutePath,
+                    resolvedFilePath.absolutePath,
                     isAudioOnly = true
                 )
             }
-
+ 
         } catch (e: Exception) {
             if (repository.getDownloadById(downloadId)?.status == DownloadStatus.CANCELLED) {
                 showToast("Download cancelled: ${downloadEntity.title}")
@@ -703,29 +751,30 @@ class DownloadService(
                 // Defaulting to false for subtitles on redownload
                 executeAudioDownload(
                     updatedEntity,
+                    videoInfo,
                     selectedAudio,
                     sanitizedTitle,
                     selectedAudio.ext ?: "mp3",
                     false,
                     ""
                 )
-
+ 
             } else {
                 val targetVideoHeight = parseQualityFromString(existingEntity.videoFormat)
                 val targetAudioBitrate = parseQualityFromString(existingEntity.audioFormat)
-
+ 
                 val selectedVideo = findNearestVideoFormat(formats, targetVideoHeight, "mp4")
                     ?: findNearestVideoFormat(formats, targetVideoHeight, "webm")
                     ?: formats.filter { it.vcodec != "none" && it.acodec == "none" }
                         .maxByOrNull { it.height ?: 0 }
-
+ 
                 val selectedAudio = findNearestAudioFormat(formats, targetAudioBitrate, "m4a")
                     ?: findNearestAudioFormat(formats, targetAudioBitrate, "webm")
                     ?: formats.filter { it.acodec != "none" && it.vcodec == "none" }
                         .maxByOrNull { it.abr ?: 0 }
-
+ 
                 if (selectedVideo == null || selectedAudio == null) throw Exception("Could not find suitable video/audio formats")
-
+ 
                 val newTotalSize = (selectedVideo.fileSize ?: 0L) + (selectedAudio.fileSize ?: 0L)
                 val updatedEntity = queuedEntity.copy(
                     fileSize = if (newTotalSize > 0) newTotalSize else 0L,
@@ -733,10 +782,11 @@ class DownloadService(
                     audioFormat = "${selectedAudio.abr}kbps"
                 )
                 repository.updateDownload(updatedEntity)
-
+ 
                 // Defaulting to false for subtitles on redownload
                 executeVideoDownload(
                     updatedEntity,
+                    videoInfo,
                     selectedVideo,
                     selectedAudio,
                     sanitizedTitle,
@@ -828,5 +878,95 @@ class DownloadService(
         val trimmed = url.trim()
         return trimmed.contains("list=", ignoreCase = true) || 
                trimmed.contains("/playlist", ignoreCase = true)
+    }
+
+    private fun getTargetDir(
+        url: String,
+        videoInfo: VideoInfo?,
+        isAudioOnly: Boolean,
+        prefs: android.content.SharedPreferences
+    ): File {
+        val key = if (isAudioOnly) "audio_download_folder" else "video_download_folder"
+        val defaultPath = if (isAudioOnly) {
+            "${Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)}/nosved/Audio"
+        } else {
+            "${Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)}/nosved"
+        }
+        val basePath = prefs.getString(key, defaultPath)?.ifBlank { defaultPath } ?: defaultPath
+        var dir = File(basePath)
+
+        val saveToSubdirWebsite = prefs.getBoolean("save_to_subdirectory_website", false)
+        val saveToSubdirPlaylist = prefs.getBoolean("save_to_subdirectory_playlist", false)
+
+        if (saveToSubdirWebsite) {
+            val domain = getCleanDomain(url)
+            dir = File(dir, domain)
+        }
+
+        if (saveToSubdirPlaylist && videoInfo != null) {
+            val playlistName = try {
+                val method = videoInfo.javaClass.methods.find { it.name == "getPlaylist" || it.name == "playlist" }
+                method?.invoke(videoInfo) as? String
+            } catch (e: Exception) {
+                try {
+                    val field = videoInfo.javaClass.fields.find { it.name == "playlist" }
+                    field?.get(videoInfo) as? String
+                } catch (ex: Exception) {
+                    null
+                }
+            }
+            if (!playlistName.isNullOrBlank()) {
+                val sanitizedPlaylist = sanitizeTitle(playlistName)
+                dir = File(dir, sanitizedPlaylist)
+            }
+        }
+
+        if (!dir.exists()) {
+            dir.mkdirs()
+        }
+        return dir
+    }
+
+    private fun getCleanDomain(url: String): String {
+        return try {
+            val host = java.net.URI(url).host?.lowercase(Locale.ROOT) ?: return "Other"
+            when {
+                host.contains("youtube.com") || host.contains("youtu.be") -> "Youtube"
+                host.contains("vimeo.com") -> "Vimeo"
+                host.contains("soundcloud.com") -> "SoundCloud"
+                host.contains("instagram.com") -> "Instagram"
+                host.contains("tiktok.com") -> "TikTok"
+                host.contains("facebook.com") || host.contains("fb.watch") -> "Facebook"
+                host.contains("twitter.com") || host.contains("x.com") -> "X"
+                else -> {
+                    val cleanHost = host.removePrefix("www.")
+                    val domainName = cleanHost.substringBefore(".")
+                    domainName.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.ROOT) else it.toString() }
+                }
+            }
+        } catch (e: Exception) {
+            "Other"
+        }
+    }
+
+    private fun extractDestinationPath(line: String): String? {
+        return when {
+            line.contains("[download] Destination:") -> {
+                line.substringAfter("[download] Destination:").trim()
+            }
+            line.contains("[Merger] Merging formats into") -> {
+                line.substringAfter("[Merger] Merging formats into").trim().removeSurrounding("\"")
+            }
+            line.contains("[ExtractAudio] Destination:") -> {
+                line.substringAfter("[ExtractAudio] Destination:").trim()
+            }
+            line.contains("has already been downloaded") && line.contains("[download]") -> {
+                line.substringAfter("[download]").substringBefore("has already been downloaded").trim()
+            }
+            line.contains("Merging formats into") -> {
+                line.substringAfter("Merging formats into").trim().removeSurrounding("\"")
+            }
+            else -> null
+        }
     }
 }

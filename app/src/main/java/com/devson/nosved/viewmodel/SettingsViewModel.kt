@@ -66,6 +66,24 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     val enableSponsorsBlock: StateFlow<Boolean> = settingsRepo.enableSponsorsBlockFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
+    val videoDownloadFolder: StateFlow<String> = settingsRepo.videoDownloadFolderFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "/storage/emulated/0/Download/Nosved")
+
+    val audioDownloadFolder: StateFlow<String> = settingsRepo.audioDownloadFolderFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "/storage/emulated/0/Download/Nosved/Audio")
+
+    val saveToSubdirectoryWebsite: StateFlow<Boolean> = settingsRepo.saveToSubdirectoryWebsiteFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    val saveToSubdirectoryPlaylist: StateFlow<Boolean> = settingsRepo.saveToSubdirectoryPlaylistFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    val outputTemplate: StateFlow<String> = settingsRepo.outputTemplateFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "%(title).200B.%(ext)s")
+
+    val restrictFilenames: StateFlow<Boolean> = settingsRepo.restrictFilenamesFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
     fun setDarkTheme(isDark: Boolean) {
         viewModelScope.launch { settingsRepo.setDarkTheme(isDark) }
     }
@@ -132,6 +150,30 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     fun setEnableSponsorsBlock(enabled: Boolean) {
         viewModelScope.launch { settingsRepo.setEnableSponsorsBlock(enabled) }
+    }
+
+    fun setVideoDownloadFolder(folder: String) {
+        viewModelScope.launch { settingsRepo.setVideoDownloadFolder(folder) }
+    }
+
+    fun setAudioDownloadFolder(folder: String) {
+        viewModelScope.launch { settingsRepo.setAudioDownloadFolder(folder) }
+    }
+
+    fun setSaveToSubdirectoryWebsite(enabled: Boolean) {
+        viewModelScope.launch { settingsRepo.setSaveToSubdirectoryWebsite(enabled) }
+    }
+
+    fun setSaveToSubdirectoryPlaylist(enabled: Boolean) {
+        viewModelScope.launch { settingsRepo.setSaveToSubdirectoryPlaylist(enabled) }
+    }
+
+    fun setOutputTemplate(template: String) {
+        viewModelScope.launch { settingsRepo.setOutputTemplate(template) }
+    }
+
+    fun setRestrictFilenames(enabled: Boolean) {
+        viewModelScope.launch { settingsRepo.setRestrictFilenames(enabled) }
     }
 
     override fun onCleared() {

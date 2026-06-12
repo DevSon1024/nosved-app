@@ -828,7 +828,7 @@ fun QualitySettingsScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Text("Preferred Video Format", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                listOf("quality" to "Quality (AV1, VP9, H.265)", "legacy" to "Legacy-MP4 (H.264)").forEach { item ->
+                listOf("quality" to "Quality (WEBM)", "legacy" to "Legacy (MP4)").forEach { item ->
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()

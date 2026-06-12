@@ -19,6 +19,7 @@ import com.devson.nosved.ui.screens.settings.AppearanceSettingsScreen
 import com.devson.nosved.ui.screens.settings.CreditsScreen
 import com.devson.nosved.ui.screens.settings.QualitySettingsScreen
 import com.devson.nosved.ui.screens.settings.SubtitleScreen
+import com.devson.nosved.ui.screens.settings.DirectorySettingsScreen
 import com.devson.nosved.ui.screens.FormatSelectionScreen
 import com.devson.nosved.viewmodel.MainViewModel
 
@@ -141,7 +142,8 @@ fun MainContent(mainViewModel: MainViewModel) {
                     onNavigateToAdvancedSettings = { navController.navigate(Screen.AdvancedSettings.route) },
                     onNavigateToAppVersion = { navController.navigate(Screen.AppVersion.route) },
                     onNavigateToCredits = { navController.navigate(Screen.Credits.route) },
-                    onNavigateToAppearanceSettings = { navController.navigate(Screen.AppearanceSettings.route) }
+                    onNavigateToAppearanceSettings = { navController.navigate(Screen.AppearanceSettings.route) },
+                    onNavigateToDirectorySettings = { navController.navigate(Screen.DirectorySettings.route) }
                 )
             }
             composable(Screen.Credits.route) {
@@ -163,6 +165,9 @@ fun MainContent(mainViewModel: MainViewModel) {
             }
             composable(Screen.SubtitleSettings.route) {
                 SubtitleScreen(onNavigateBack = { navController.navigateUp() })
+            }
+            composable(Screen.DirectorySettings.route) {
+                DirectorySettingsScreen(onNavigateBack = { navController.navigateUp() })
             }
             composable(Screen.FormatSelection.route) {
                 FormatSelectionScreen(

@@ -71,6 +71,31 @@ class SettingsRepository(context: Context) {
     private val _enableSponsorsBlockFlow = MutableStateFlow(prefs.getBoolean("enable_sponsors_block", false))
     val enableSponsorsBlockFlow: StateFlow<Boolean> = _enableSponsorsBlockFlow.asStateFlow()
 
+    // Directory settings configurations
+    private val _videoDownloadFolderFlow = MutableStateFlow(
+        prefs.getString("video_download_folder", "/storage/emulated/0/Download/Nosved") ?: "/storage/emulated/0/Download/Nosved"
+    )
+    val videoDownloadFolderFlow: StateFlow<String> = _videoDownloadFolderFlow.asStateFlow()
+
+    private val _audioDownloadFolderFlow = MutableStateFlow(
+        prefs.getString("audio_download_folder", "/storage/emulated/0/Download/Nosved/Audio") ?: "/storage/emulated/0/Download/Nosved/Audio"
+    )
+    val audioDownloadFolderFlow: StateFlow<String> = _audioDownloadFolderFlow.asStateFlow()
+
+    private val _saveToSubdirectoryWebsiteFlow = MutableStateFlow(prefs.getBoolean("save_to_subdirectory_website", false))
+    val saveToSubdirectoryWebsiteFlow: StateFlow<Boolean> = _saveToSubdirectoryWebsiteFlow.asStateFlow()
+
+    private val _saveToSubdirectoryPlaylistFlow = MutableStateFlow(prefs.getBoolean("save_to_subdirectory_playlist", false))
+    val saveToSubdirectoryPlaylistFlow: StateFlow<Boolean> = _saveToSubdirectoryPlaylistFlow.asStateFlow()
+
+    private val _outputTemplateFlow = MutableStateFlow(
+        prefs.getString("output_template", "%(title).200B.%(ext)s") ?: "%(title).200B.%(ext)s"
+    )
+    val outputTemplateFlow: StateFlow<String> = _outputTemplateFlow.asStateFlow()
+
+    private val _restrictFilenamesFlow = MutableStateFlow(prefs.getBoolean("restrict_filenames", false))
+    val restrictFilenamesFlow: StateFlow<Boolean> = _restrictFilenamesFlow.asStateFlow()
+
     private val preferenceChangeListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         when (key) {
             "is_dark_theme" -> {
@@ -124,6 +149,24 @@ class SettingsRepository(context: Context) {
             }
             "enable_sponsors_block" -> {
                 _enableSponsorsBlockFlow.value = prefs.getBoolean("enable_sponsors_block", false)
+            }
+            "video_download_folder" -> {
+                _videoDownloadFolderFlow.value = prefs.getString("video_download_folder", "/storage/emulated/0/Download/Nosved") ?: "/storage/emulated/0/Download/Nosved"
+            }
+            "audio_download_folder" -> {
+                _audioDownloadFolderFlow.value = prefs.getString("audio_download_folder", "/storage/emulated/0/Download/Nosved/Audio") ?: "/storage/emulated/0/Download/Nosved/Audio"
+            }
+            "save_to_subdirectory_website" -> {
+                _saveToSubdirectoryWebsiteFlow.value = prefs.getBoolean("save_to_subdirectory_website", false)
+            }
+            "save_to_subdirectory_playlist" -> {
+                _saveToSubdirectoryPlaylistFlow.value = prefs.getBoolean("save_to_subdirectory_playlist", false)
+            }
+            "output_template" -> {
+                _outputTemplateFlow.value = prefs.getString("output_template", "%(title).200B.%(ext)s") ?: "%(title).200B.%(ext)s"
+            }
+            "restrict_filenames" -> {
+                _restrictFilenamesFlow.value = prefs.getBoolean("restrict_filenames", false)
             }
         }
     }
@@ -211,5 +254,29 @@ class SettingsRepository(context: Context) {
 
     fun setEnableSponsorsBlock(enabled: Boolean) {
         prefs.edit().putBoolean("enable_sponsors_block", enabled).apply()
+    }
+
+    fun setVideoDownloadFolder(folder: String) {
+        prefs.edit().putString("video_download_folder", folder).apply()
+    }
+
+    fun setAudioDownloadFolder(folder: String) {
+        prefs.edit().putString("audio_download_folder", folder).apply()
+    }
+
+    fun setSaveToSubdirectoryWebsite(enabled: Boolean) {
+        prefs.edit().putBoolean("save_to_subdirectory_website", enabled).apply()
+    }
+
+    fun setSaveToSubdirectoryPlaylist(enabled: Boolean) {
+        prefs.edit().putBoolean("save_to_subdirectory_playlist", enabled).apply()
+    }
+
+    fun setOutputTemplate(template: String) {
+        prefs.edit().putString("output_template", template).apply()
+    }
+
+    fun setRestrictFilenames(enabled: Boolean) {
+        prefs.edit().putBoolean("restrict_filenames", enabled).apply()
     }
 }

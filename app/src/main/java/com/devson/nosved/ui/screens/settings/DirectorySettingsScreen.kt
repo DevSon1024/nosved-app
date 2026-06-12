@@ -1,0 +1,714 @@
+package com.devson.nosved.ui.screens.settings
+
+import android.content.Context
+import android.net.Uri
+import android.os.Environment
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.devson.nosved.viewmodel.SettingsViewModel
+import java.io.File
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DirectorySettingsScreen(
+    onNavigateBack: () -> Unit,
+    viewModel: SettingsViewModel = viewModel()
+) {
+    val context = LocalContext.current
+
+    val videoFolder by viewModel.videoDownloadFolder.collectAsState()
+    val audioFolder by viewModel.audioDownloadFolder.collectAsState()
+    val saveToSubdirWebsite by viewModel.saveToSubdirectoryWebsite.collectAsState()
+    val saveToSubdirPlaylist by viewModel.saveToSubdirectoryPlaylist.collectAsState()
+    val outputTemplate by viewModel.outputTemplate.collectAsState()
+    val restrictFilenames by viewModel.restrictFilenames.collectAsState()
+
+    var showVideoFolderDialog by remember { mutableStateOf(false) }
+    var showAudioFolderDialog by remember { mutableStateOf(false) }
+    var showSubdirDialog by remember { mutableStateOf(false) }
+    var showOutputTemplateDialog by remember { mutableStateOf(false) }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Directory Setup", fontWeight = FontWeight.SemiBold) },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background,
+                    titleContentColor = MaterialTheme.colorScheme.onBackground,
+                    navigationIconContentColor = MaterialTheme.colorScheme.onBackground
+                )
+            )
+        },
+        containerColor = MaterialTheme.colorScheme.background
+    ) { paddingValues ->
+        LazyColumn(
+            modifier = Modifier
+                .padding(top = paddingValues.calculateTopPadding())
+                .fillMaxSize(),
+            contentPadding = PaddingValues(
+                start = 16.dp,
+                top = 16.dp,
+                end = 16.dp,
+                bottom = paddingValues.calculateBottomPadding() + 16.dp
+            ),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // Folders Section
+            item {
+                Text(
+                    text = "Folders",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
+                )
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        // Video Folder Row
+                        DirectorySettingItem(
+                            title = "Video Folder",
+                            subtitle = videoFolder,
+                            onClick = { showVideoFolderDialog = true }
+                        )
+
+                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
+
+                        // Audio Folder Row
+                        DirectorySettingItem(
+                            title = "Audio Folder",
+                            subtitle = audioFolder,
+                            onClick = { showAudioFolderDialog = true }
+                        )
+                    }
+                }
+            }
+
+            // Organization Section
+            item {
+                Text(
+                    text = "Organization & Naming",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
+                )
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        // Save to subdirectory Row
+                        val websiteStr = if (saveToSubdirWebsite) "Website" else ""
+                        val playlistStr = if (saveToSubdirPlaylist) "Playlist title" else ""
+                        val subdirSubtitle = when {
+                            saveToSubdirWebsite && saveToSubdirPlaylist -> "Website, Playlist title"
+                            saveToSubdirWebsite -> "Website"
+                            saveToSubdirPlaylist -> "Playlist title"
+                            else -> "None"
+                        }
+                        DirectorySettingItem(
+                            title = "Save to Subdirectory",
+                            subtitle = subdirSubtitle,
+                            onClick = { showSubdirDialog = true }
+                        )
+
+                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
+
+                        // Output template Row
+                        DirectorySettingItem(
+                            title = "Output Template",
+                            subtitle = outputTemplate,
+                            onClick = { showOutputTemplateDialog = true }
+                        )
+
+                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
+
+                        // Restrict Filenames Switch
+                        AdvancedSettingRow(
+                            title = "Restrict Filenames",
+                            subtitle = "Limit filenames to ASCII characters (removes emojis/spaces)",
+                            checked = restrictFilenames,
+                            onToggle = { viewModel.setRestrictFilenames(it) }
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    // Dialogs
+    if (showVideoFolderDialog) {
+        CustomDirectoryDialog(
+            title = "Video Folder",
+            description = "Specify the output directory for downloaded videos",
+            currentPath = videoFolder,
+            onDismiss = { showVideoFolderDialog = false },
+            onConfirm = { path ->
+                viewModel.setVideoDownloadFolder(path)
+                showVideoFolderDialog = false
+            }
+        )
+    }
+
+    if (showAudioFolderDialog) {
+        CustomDirectoryDialog(
+            title = "Audio Folder",
+            description = "Specify the output directory for downloaded audios",
+            currentPath = audioFolder,
+            onDismiss = { showAudioFolderDialog = false },
+            onConfirm = { path ->
+                viewModel.setAudioDownloadFolder(path)
+                showAudioFolderDialog = false
+            }
+        )
+    }
+
+    if (showSubdirDialog) {
+        SubdirectorySelectionDialog(
+            initialWebsite = saveToSubdirWebsite,
+            initialPlaylist = saveToSubdirPlaylist,
+            onDismiss = { showSubdirDialog = false },
+            onConfirm = { website, playlist ->
+                viewModel.setSaveToSubdirectoryWebsite(website)
+                viewModel.setSaveToSubdirectoryPlaylist(playlist)
+                showSubdirDialog = false
+            }
+        )
+    }
+
+    if (showOutputTemplateDialog) {
+        OutputTemplateSelectionDialog(
+            currentTemplate = outputTemplate,
+            onDismiss = { showOutputTemplateDialog = false },
+            onConfirm = { template ->
+                viewModel.setOutputTemplate(template)
+                showOutputTemplateDialog = false
+            }
+        )
+    }
+}
+
+@Composable
+fun DirectorySettingItem(
+    title: String,
+    subtitle: String,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 12.dp, horizontal = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Icon(
+            imageVector = Icons.Default.ChevronRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(20.dp)
+        )
+    }
+}
+
+@Composable
+fun CustomDirectoryDialog(
+    title: String,
+    description: String,
+    currentPath: String,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit
+) {
+    var pathText by remember { mutableStateOf(currentPath) }
+    val context = LocalContext.current
+
+    val folderPickerLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocumentTree()
+    ) { uri: Uri? ->
+        uri?.let {
+            val resolvedPath = getPathFromUri(context, it)
+            if (resolvedPath != null) {
+                pathText = resolvedPath
+            } else {
+                pathText = it.toString()
+            }
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                imageVector = Icons.Default.Folder,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(32.dp)
+            )
+        },
+        title = {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Medium
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = description,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                OutlinedTextField(
+                    value = pathText,
+                    onValueChange = { pathText = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Directory Path") },
+                    leadingIcon = {
+                        Text(
+                            text = "-P",
+                            modifier = Modifier.padding(start = 12.dp),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                        )
+                    },
+                    shape = RoundedCornerShape(12.dp)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = { folderPickerLauncher.launch(null) },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                        ),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.FolderOpen,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Folder picker", fontSize = 13.sp)
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, Uri.parse("https://github.com/yt-dlp/yt-dlp#output-template"))
+                            context.startActivity(intent)
+                        },
+                        modifier = Modifier.weight(1.2f),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.OpenInNew,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Usage reference", fontSize = 13.sp)
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(pathText) }) {
+                Text("Confirm")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        },
+        shape = RoundedCornerShape(28.dp),
+        containerColor = MaterialTheme.colorScheme.surface,
+        tonalElevation = 6.dp
+    )
+}
+
+@Composable
+fun SubdirectorySelectionDialog(
+    initialWebsite: Boolean,
+    initialPlaylist: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: (Boolean, Boolean) -> Unit
+) {
+    var websiteChecked by remember { mutableStateOf(initialWebsite) }
+    var playlistChecked by remember { mutableStateOf(initialPlaylist) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                imageVector = Icons.Default.FolderZip,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(32.dp)
+            )
+        },
+        title = {
+            Text(
+                text = "Save to subdirectory",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Medium
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = "Save files in folders named as respective fields",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { websiteChecked = !websiteChecked }
+                        .padding(vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(
+                        checked = websiteChecked,
+                        onCheckedChange = { websiteChecked = it }
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Website",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                }
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { playlistChecked = !playlistChecked }
+                        .padding(vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(
+                        checked = playlistChecked,
+                        onCheckedChange = { playlistChecked = it }
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Playlist title",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                }
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+
+                Column {
+                    Text(
+                        text = "Your downloads will be saved as:",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    val examplePath = when {
+                        websiteChecked && playlistChecked -> ".../website/playlist_title/file_name"
+                        websiteChecked -> ".../website/file_name"
+                        playlistChecked -> ".../playlist_title/file_name"
+                        else -> ".../file_name"
+                    }
+                    Text(
+                        text = examplePath,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(websiteChecked, playlistChecked) }) {
+                Text("Confirm")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        },
+        shape = RoundedCornerShape(28.dp),
+        containerColor = MaterialTheme.colorScheme.surface,
+        tonalElevation = 6.dp
+    )
+}
+
+@Composable
+fun OutputTemplateSelectionDialog(
+    currentTemplate: String,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit
+) {
+    val option1 = "%(title).200B.%(ext)s"
+    val option2 = "%(title).200B [%(id)s].%(ext)s"
+
+    var selectedOption by remember {
+        mutableStateOf(
+            when (currentTemplate) {
+                option1 -> 1
+                option2 -> 2
+                else -> 3
+            }
+        )
+    }
+
+    var customText by remember {
+        mutableStateOf(
+            if (selectedOption == 3) currentTemplate else option2
+        )
+    }
+
+    val context = LocalContext.current
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                imageVector = Icons.Default.InsertDriveFile,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(32.dp)
+            )
+        },
+        title = {
+            Text(
+                text = "Output template",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Medium
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = "Specify the template for output file names",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+
+                // Option 1
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { selectedOption = 1 }
+                        .padding(vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    RadioButton(
+                        selected = selectedOption == 1,
+                        onClick = { selectedOption = 1 }
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = option1,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+
+                // Option 2
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { selectedOption = 2 }
+                        .padding(vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    RadioButton(
+                        selected = selectedOption == 2,
+                        onClick = { selectedOption = 2 }
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = option2,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+
+                // Option 3 (Custom)
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { selectedOption = 3 }
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(
+                            selected = selectedOption == 3,
+                            onClick = { selectedOption = 3 }
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Custom",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+
+                    if (selectedOption == 3) {
+                        OutlinedTextField(
+                            value = customText,
+                            onValueChange = { customText = it },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(start = 32.dp, top = 4.dp),
+                            placeholder = { Text(option2) },
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        Text(
+                            text = "Required: %(title).200B, .%(ext)s",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                            modifier = Modifier.padding(start = 36.dp, top = 4.dp)
+                        )
+                    }
+                }
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, Uri.parse("https://github.com/yt-dlp/yt-dlp#output-template"))
+                            context.startActivity(intent)
+                        }
+                        .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.OpenInNew,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Text(
+                        text = "Yt-dlp usage references",
+                        color = MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    val finalTemplate = when (selectedOption) {
+                        1 -> option1
+                        2 -> option2
+                        else -> {
+                            if (customText.isBlank()) option2 else customText
+                        }
+                    }
+                    onConfirm(finalTemplate)
+                }
+            ) {
+                Text("Confirm")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        },
+        shape = RoundedCornerShape(28.dp),
+        containerColor = MaterialTheme.colorScheme.surface,
+        tonalElevation = 6.dp
+    )
+}
+
+private fun getPathFromUri(context: Context, uri: Uri): String? {
+    try {
+        if (android.provider.DocumentsContract.isTreeUri(uri)) {
+            val treeId = android.provider.DocumentsContract.getTreeDocumentId(uri)
+            val split = treeId.split(":")
+            if (split.isNotEmpty()) {
+                val type = split[0]
+                val path = if (split.size > 1) split[1] else ""
+                return if ("primary".equals(type, ignoreCase = true)) {
+                    "${Environment.getExternalStorageDirectory()}/$path"
+                } else {
+                    "/storage/$type/$path"
+                }
+            }
+        }
+    } catch (e: Exception) {
+        // Fallback to URI path
+    }
+    return null
+}

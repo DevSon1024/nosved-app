@@ -46,27 +46,17 @@ fun SettingsScreen(
     onNavigateToAdvancedSettings: () -> Unit,
     onNavigateToAppVersion: () -> Unit,
     onNavigateToCredits: () -> Unit,
-    onNavigateToAppearanceSettings: () -> Unit
+    onNavigateToAppearanceSettings: () -> Unit,
+    onNavigateToDirectorySettings: () -> Unit
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    var dialogState by remember { mutableStateOf<DialogState>(DialogState.None) }
     var storageInfo by remember { mutableStateOf("Calculating..." to "...") }
 
     LaunchedEffect(Unit) {
         storageInfo = withContext(Dispatchers.IO) {
             getStorageInfoOptimized(context)
-        }
-    }
-
-    val downloadFolder = remember { getCurrentDownloadFolder(context) }
-
-    val folderPickerLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocumentTree()
-    ) { uri: Uri? ->
-        uri?.let {
-            showToast(context, "Download folder updated!")
         }
     }
 
@@ -126,9 +116,9 @@ fun SettingsScreen(
                     SettingsGroupCard {
                         SettingsItemRow(
                             icon = Icons.Default.Folder,
-                            title = "Download Location",
-                            subtitle = downloadFolder.substringAfterLast("/"),
-                            onClick = { dialogState = DialogState.DownloadLocation }
+                            title = "Directory Setup",
+                            subtitle = "Configure download folders and output templates",
+                            onClick = onNavigateToDirectorySettings
                         )
                         HorizontalDivider(
                             modifier = Modifier.padding(start = 72.dp),
@@ -231,31 +221,6 @@ fun SettingsScreen(
                     }
                 }
             }
-        }
-    }
-
-    // Handle dialogs
-    when (val currentDialogState = dialogState) {
-        is DialogState.DownloadLocation -> {
-            DownloadFolderDialog(
-                downloadFolder = downloadFolder,
-                onDismiss = { dialogState = DialogState.None },
-                onChooseFolder = {
-                    dialogState = DialogState.None
-                    folderPickerLauncher.launch(null)
-                },
-                onResetFolder = {
-                    dialogState = DialogState.None
-                    showToast(context, "Reset to default folder")
-                },
-                onOpenFolder = {
-                    dialogState = DialogState.None
-                    openDownloadFolderInFileManager(context, downloadFolder)
-                }
-            )
-        }
-        is DialogState.None -> {
-            // No dialog to show
         }
     }
 }
