@@ -282,14 +282,14 @@ class DownloadService(
                 request.addOption("-S", sortingFields)
             }
  
-            var capturedFilePath: String? = null
+            val capturedFilePath = java.util.concurrent.atomic.AtomicReference<String?>(null)
  
             YoutubeDL.getInstance().execute(request, downloadId) { progress, _, line ->
+                val path = extractDestinationPath(line)
+                if (path != null) {
+                    capturedFilePath.set(path)
+                }
                 coroutineScope.launch(Dispatchers.IO) {
-                    val path = extractDestinationPath(line)
-                    if (path != null) {
-                        capturedFilePath = path
-                    }
                     val newDescription = parseTaskDescription(line)
                     val oldProgress = progressFlow.value[downloadId]
                     val taskDescription =
@@ -323,9 +323,15 @@ class DownloadService(
                 return@withContext
             }
  
-            val resolvedFilePath = if (!capturedFilePath.isNullOrBlank()) {
-                val file = File(capturedFilePath!!)
-                if (file.isAbsolute) file else File(nosvedDir, capturedFilePath!!)
+            val finalPathStr = capturedFilePath.get()
+            val resolvedFilePath = if (!finalPathStr.isNullOrBlank()) {
+                val file = File(finalPathStr)
+                val resolved = if (file.isAbsolute) file else File(nosvedDir, finalPathStr)
+                if (resolved.absolutePath.startsWith(tempDir.absolutePath)) {
+                    File(nosvedDir, resolved.name)
+                } else {
+                    resolved
+                }
             } else {
                 val ext = if (remuxVideoContainer) "mkv" else outputExtension
                 val evaluatedName = template
@@ -570,14 +576,14 @@ class DownloadService(
                 request.addOption("-S", sortingFields)
             }
  
-            var capturedFilePath: String? = null
+            val capturedFilePath = java.util.concurrent.atomic.AtomicReference<String?>(null)
  
             YoutubeDL.getInstance().execute(request, downloadId) { progress, _, line ->
+                val path = extractDestinationPath(line)
+                if (path != null) {
+                    capturedFilePath.set(path)
+                }
                 coroutineScope.launch(Dispatchers.IO) {
-                    val path = extractDestinationPath(line)
-                    if (path != null) {
-                        capturedFilePath = path
-                    }
                     val newDescription = parseTaskDescription(line)
                     val oldProgress = progressFlow.value[downloadId]
                     val taskDescription =
@@ -611,9 +617,15 @@ class DownloadService(
                 return@withContext
             }
  
-            val resolvedFilePath = if (!capturedFilePath.isNullOrBlank()) {
-                val file = File(capturedFilePath!!)
-                if (file.isAbsolute) file else File(nosvedDir, capturedFilePath!!)
+            val finalPathStr = capturedFilePath.get()
+            val resolvedFilePath = if (!finalPathStr.isNullOrBlank()) {
+                val file = File(finalPathStr)
+                val resolved = if (file.isAbsolute) file else File(nosvedDir, finalPathStr)
+                if (resolved.absolutePath.startsWith(tempDir.absolutePath)) {
+                    File(nosvedDir, resolved.name)
+                } else {
+                    resolved
+                }
             } else {
                 val ext = if (convertAudioEnabled) convertAudioFormat else audioExtension
                 val evaluatedName = template
