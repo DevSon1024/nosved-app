@@ -56,6 +56,16 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
+        <receiver
+            android:name=".data.service.DownloadActionReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.devson.nosved.ACTION_PAUSE" />
+                <action android:name="com.devson.nosved.ACTION_RESUME" />
+                <action android:name="com.devson.nosved.ACTION_CANCEL" />
+            </intent-filter>
+        </receiver>
+
     </application>
 
 </manifest>

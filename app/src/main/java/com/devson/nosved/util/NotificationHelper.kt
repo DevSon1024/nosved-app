@@ -36,15 +36,75 @@ class NotificationHelper(private val context: Context) {
      * @param title The title of the video being downloaded.
      * @param line The progress line from yt-dlp (e.g., percentage, speed).
      */
-    fun showDownloadProgressNotification(notificationId: Int, title: String, line: String) {
-        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setContentTitle(title) // Use the video title
+    fun showDownloadProgressNotification(
+        notificationId: Int,
+        downloadId: String,
+        title: String,
+        line: String,
+        status: com.devson.nosved.data.DownloadStatus
+    ) {
+        val pauseIntent = Intent(context, com.devson.nosved.data.service.DownloadActionReceiver::class.java).apply {
+            action = "com.devson.nosved.ACTION_PAUSE"
+            putExtra("download_id", downloadId)
+        }
+        val pausePendingIntent = PendingIntent.getBroadcast(
+            context,
+            notificationId * 3 + 1,
+            pauseIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val resumeIntent = Intent(context, com.devson.nosved.data.service.DownloadActionReceiver::class.java).apply {
+            action = "com.devson.nosved.ACTION_RESUME"
+            putExtra("download_id", downloadId)
+        }
+        val resumePendingIntent = PendingIntent.getBroadcast(
+            context,
+            notificationId * 3 + 2,
+            resumeIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val cancelIntent = Intent(context, com.devson.nosved.data.service.DownloadActionReceiver::class.java).apply {
+            action = "com.devson.nosved.ACTION_CANCEL"
+            putExtra("download_id", downloadId)
+        }
+        val cancelPendingIntent = PendingIntent.getBroadcast(
+            context,
+            notificationId * 3 + 3,
+            cancelIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val builder = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setContentTitle(title)
             .setContentText(line)
-            .setSmallIcon(R.drawable.ic_launcher_foreground) // TODO: Use a proper download icon
-            .setOngoing(true)
-            .setOnlyAlertOnce(true) // Don't make sound for every progress update
-            .build()
-        notificationManager.notify(notificationId, notification)
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setOnlyAlertOnce(true)
+
+        if (status == com.devson.nosved.data.DownloadStatus.PAUSED) {
+            builder.setOngoing(false)
+            builder.addAction(
+                android.R.drawable.ic_media_play,
+                "Resume",
+                resumePendingIntent
+            )
+        } else {
+            builder.setOngoing(true)
+            builder.addAction(
+                android.R.drawable.ic_media_pause,
+                "Pause",
+                pausePendingIntent
+            )
+        }
+
+        builder.addAction(
+            android.R.drawable.ic_menu_close_clear_cancel,
+            "Cancel",
+            cancelPendingIntent
+        )
+
+        notificationManager.notify(notificationId, builder.build())
     }
 
     /**

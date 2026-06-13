@@ -345,6 +345,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun pauseDownload(downloadId: String) {
+        viewModelScope.launch {
+            downloadService.pauseDownload(downloadId)
+        }
+    }
+
+    fun resumeDownload(downloadId: String) {
+        viewModelScope.launch {
+            downloadService.resumeDownload(downloadId)
+        }
+    }
+
     fun removeFromApp(downloadId: String) {
         viewModelScope.launch {
             downloadService.removeFromApp(downloadId)

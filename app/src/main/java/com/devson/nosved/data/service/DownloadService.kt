@@ -37,8 +37,17 @@ class DownloadService(
     private val repository: DownloadRepository,
     private val notificationHelper: NotificationHelper,
     private val progressFlow: MutableStateFlow<Map<String, DownloadProgress>>,
-    private val coroutineScope: CoroutineScope
+    val coroutineScope: CoroutineScope
 ) {
+    companion object {
+        @Volatile
+        var instance: DownloadService? = null
+            private set
+    }
+
+    init {
+        instance = this
+    }
 
     // Helper to generate a stable, unique integer ID for notifications
     private fun getNotificationId(downloadId: String): Int = abs(downloadId.hashCode())
@@ -169,7 +178,13 @@ class DownloadService(
             val finalFilePath = File(nosvedDir, "${sanitizedTitle}.${actualExtension}")
  
             val request = YoutubeDLRequest(downloadEntity.url)
-            request.addOption("-o", File(nosvedDir, template).absolutePath)
+            val tempDir = File("/storage/emulated/0/Download/Nosved/temp")
+            if (!tempDir.exists()) {
+                tempDir.mkdirs()
+            }
+            request.addOption("--paths", "home:${nosvedDir.absolutePath}")
+            request.addOption("--paths", "temp:${tempDir.absolutePath}")
+            request.addOption("-o", template)
  
             if (restrictFilenames) {
                 request.addOption("--restrict-filenames")
@@ -269,7 +284,7 @@ class DownloadService(
  
             var capturedFilePath: String? = null
  
-            YoutubeDL.getInstance().execute(request) { progress, _, line ->
+            YoutubeDL.getInstance().execute(request, downloadId) { progress, _, line ->
                 coroutineScope.launch(Dispatchers.IO) {
                     val path = extractDestinationPath(line)
                     if (path != null) {
@@ -294,8 +309,10 @@ class DownloadService(
                     if (isNotificationEnabled) {
                         notificationHelper.showDownloadProgressNotification(
                             notificationId,
+                            downloadId,
                             downloadEntity.title,
-                            line
+                            line,
+                            DownloadStatus.DOWNLOADING
                         )
                     }
                 }
@@ -307,7 +324,8 @@ class DownloadService(
             }
  
             val resolvedFilePath = if (!capturedFilePath.isNullOrBlank()) {
-                File(capturedFilePath!!)
+                val file = File(capturedFilePath!!)
+                if (file.isAbsolute) file else File(nosvedDir, capturedFilePath!!)
             } else {
                 val ext = if (remuxVideoContainer) "mkv" else outputExtension
                 val evaluatedName = template
@@ -340,8 +358,12 @@ class DownloadService(
             }
  
         } catch (e: Exception) {
-            if (repository.getDownloadById(downloadId)?.status == DownloadStatus.CANCELLED) {
+            val currentStatus = repository.getDownloadById(downloadId)?.status
+            if (currentStatus == DownloadStatus.CANCELLED) {
                 showToast("Download cancelled: ${downloadEntity.title}")
+                notificationHelper.cancelNotification(notificationId)
+            } else if (currentStatus == DownloadStatus.PAUSED) {
+                // Keep the paused notification intact, do not show failure toast
             } else {
                 showToast("Download failed: ${e.message ?: ""}")
                 repository.updateDownload(
@@ -350,11 +372,12 @@ class DownloadService(
                         error = e.message
                     )
                 )
+                notificationHelper.cancelNotification(notificationId)
             }
-            notificationHelper.cancelNotification(notificationId)
         } finally {
             progressFlow.value = progressFlow.value - downloadId
-            if (incognitoMode) {
+            val currentStatus = repository.getDownloadById(downloadId)?.status
+            if (incognitoMode && currentStatus != DownloadStatus.PAUSED) {
                 repository.deleteDownload(downloadId)
             }
             try {
@@ -468,7 +491,13 @@ class DownloadService(
             val finalFilePath = File(nosvedDir, "${sanitizedTitle}.${targetAudioExtension}")
  
             val request = YoutubeDLRequest(downloadEntity.url)
-            request.addOption("-o", File(nosvedDir, template).absolutePath)
+            val tempDir = File("/storage/emulated/0/Download/Nosved/temp")
+            if (!tempDir.exists()) {
+                tempDir.mkdirs()
+            }
+            request.addOption("--paths", "home:${nosvedDir.absolutePath}")
+            request.addOption("--paths", "temp:${tempDir.absolutePath}")
+            request.addOption("-o", template)
  
             if (restrictFilenames) {
                 request.addOption("--restrict-filenames")
@@ -543,7 +572,7 @@ class DownloadService(
  
             var capturedFilePath: String? = null
  
-            YoutubeDL.getInstance().execute(request) { progress, _, line ->
+            YoutubeDL.getInstance().execute(request, downloadId) { progress, _, line ->
                 coroutineScope.launch(Dispatchers.IO) {
                     val path = extractDestinationPath(line)
                     if (path != null) {
@@ -568,8 +597,10 @@ class DownloadService(
                     if (isNotificationEnabled) {
                         notificationHelper.showDownloadProgressNotification(
                             notificationId,
+                            downloadId,
                             downloadEntity.title,
-                            line
+                            line,
+                            DownloadStatus.DOWNLOADING
                         )
                     }
                 }
@@ -581,7 +612,8 @@ class DownloadService(
             }
  
             val resolvedFilePath = if (!capturedFilePath.isNullOrBlank()) {
-                File(capturedFilePath!!)
+                val file = File(capturedFilePath!!)
+                if (file.isAbsolute) file else File(nosvedDir, capturedFilePath!!)
             } else {
                 val ext = if (convertAudioEnabled) convertAudioFormat else audioExtension
                 val evaluatedName = template
@@ -614,8 +646,12 @@ class DownloadService(
             }
  
         } catch (e: Exception) {
-            if (repository.getDownloadById(downloadId)?.status == DownloadStatus.CANCELLED) {
+            val currentStatus = repository.getDownloadById(downloadId)?.status
+            if (currentStatus == DownloadStatus.CANCELLED) {
                 showToast("Download cancelled: ${downloadEntity.title}")
+                notificationHelper.cancelNotification(notificationId)
+            } else if (currentStatus == DownloadStatus.PAUSED) {
+                // Keep the paused notification intact, do not show failure toast
             } else {
                 showToast("Audio download failed: ${e.message ?: ""}")
                 repository.updateDownload(
@@ -624,11 +660,12 @@ class DownloadService(
                         error = e.message
                     )
                 )
+                notificationHelper.cancelNotification(notificationId)
             }
-            notificationHelper.cancelNotification(notificationId)
         } finally {
             progressFlow.value = progressFlow.value - downloadId
-            if (incognitoMode) {
+            val currentStatus = repository.getDownloadById(downloadId)?.status
+            if (incognitoMode && currentStatus != DownloadStatus.PAUSED) {
                 repository.deleteDownload(downloadId)
             }
             try {
@@ -814,9 +851,128 @@ class DownloadService(
     suspend fun cancelDownload(downloadId: String) = withContext(Dispatchers.IO) {
         val download = repository.getDownloadById(downloadId)
         repository.updateDownloadStatus(downloadId, DownloadStatus.CANCELLED)
+        try {
+            YoutubeDL.getInstance().destroyProcessById(downloadId)
+        } catch (e: Exception) {
+            // Safe catch
+        }
         notificationHelper.cancelNotification(getNotificationId(downloadId))
         progressFlow.value = progressFlow.value - downloadId
         download?.let { showToast("Download cancelled: ${it.title}") }
+    }
+
+    suspend fun pauseDownload(downloadId: String) = withContext(Dispatchers.IO) {
+        val download = repository.getDownloadById(downloadId)
+        repository.updateDownloadStatus(downloadId, DownloadStatus.PAUSED)
+        try {
+            YoutubeDL.getInstance().destroyProcessById(downloadId)
+        } catch (e: Exception) {
+            // Safe catch
+        }
+        progressFlow.value = progressFlow.value - downloadId
+        
+        val prefs = context.getSharedPreferences("app_settings", Context.MODE_PRIVATE)
+        val isNotificationEnabled = prefs.getBoolean("download_notification_enabled", true)
+        if (isNotificationEnabled && download != null) {
+            notificationHelper.showDownloadProgressNotification(
+                getNotificationId(downloadId),
+                downloadId,
+                download.title,
+                "Download paused",
+                DownloadStatus.PAUSED
+            )
+        }
+        download?.let { showToast("Download paused: ${it.title}") }
+    }
+
+    suspend fun resumeDownload(downloadId: String) = withContext(Dispatchers.IO) {
+        val existingEntity = repository.getDownloadById(downloadId)
+        if (existingEntity == null) {
+            showToast("Resume failed: Item not found")
+            return@withContext
+        }
+        if (existingEntity.status != DownloadStatus.PAUSED) {
+            return@withContext
+        }
+
+        val queuedEntity = existingEntity.copy(
+            status = DownloadStatus.QUEUED,
+            error = null
+        )
+        repository.updateDownload(queuedEntity)
+
+        val prefs = context.getSharedPreferences("app_settings", Context.MODE_PRIVATE)
+        val isNotificationEnabled = prefs.getBoolean("download_notification_enabled", true)
+        if (isNotificationEnabled) {
+            notificationHelper.showDownloadProgressNotification(
+                getNotificationId(downloadId),
+                downloadId,
+                existingEntity.title,
+                "Resuming download...",
+                DownloadStatus.QUEUED
+            )
+        }
+
+        showToast("Resuming download: ${existingEntity.title}")
+
+        try {
+            val videoInfoResult = VideoInfoUtil.fetchVideoInfoProgressive(existingEntity.url) { /* no progress */ }
+            val videoInfo = videoInfoResult.getOrThrow()
+            val formats = videoInfo.formats ?: throw Exception("No formats found for video")
+            val titleToUse = existingEntity.title.replace(" (Audio)", "")
+            val sanitizedTitle = sanitizeTitle(titleToUse)
+
+            if (existingEntity.videoFormat == "Audio Only") {
+                val targetAudioBitrate = parseQualityFromString(existingEntity.audioFormat)
+                val selectedAudio = findNearestAudioFormat(formats, targetAudioBitrate, "m4a")
+                    ?: findNearestAudioFormat(formats, targetAudioBitrate, "webm")
+                    ?: formats.filter { it.acodec != "none" && it.vcodec == "none" }
+                        .maxByOrNull { it.abr ?: 0 }
+                if (selectedAudio == null) throw Exception("Could not find suitable audio format")
+
+                executeAudioDownload(
+                    queuedEntity.copy(status = DownloadStatus.DOWNLOADING),
+                    videoInfo,
+                    selectedAudio,
+                    sanitizedTitle,
+                    selectedAudio.ext ?: "mp3",
+                    false,
+                    ""
+                )
+            } else {
+                val targetVideoHeight = parseQualityFromString(existingEntity.videoFormat)
+                val targetAudioBitrate = parseQualityFromString(existingEntity.audioFormat)
+                val selectedVideo = findNearestVideoFormat(formats, targetVideoHeight, "mp4")
+                    ?: findNearestVideoFormat(formats, targetVideoHeight, "webm")
+                    ?: formats.filter { it.vcodec != "none" && it.acodec == "none" }
+                        .maxByOrNull { it.height ?: 0 }
+                val selectedAudio = findNearestAudioFormat(formats, targetAudioBitrate, "m4a")
+                    ?: findNearestAudioFormat(formats, targetAudioBitrate, "webm")
+                    ?: formats.filter { it.acodec != "none" && it.vcodec == "none" }
+                        .maxByOrNull { it.abr ?: 0 }
+                if (selectedVideo == null || selectedAudio == null) throw Exception("Could not find suitable video/audio formats")
+
+                executeVideoDownload(
+                    queuedEntity.copy(status = DownloadStatus.DOWNLOADING),
+                    videoInfo,
+                    selectedVideo,
+                    selectedAudio,
+                    sanitizedTitle,
+                    "mp4",
+                    false,
+                    ""
+                )
+            }
+        } catch (e: Exception) {
+            val errorMsg = e.message ?: "Unknown error"
+            showToast("Resume failed: $errorMsg")
+            repository.updateDownload(
+                queuedEntity.copy(
+                    status = DownloadStatus.FAILED,
+                    error = "Resume failed: $errorMsg"
+                )
+            )
+        }
     }
 
     /**

@@ -593,6 +593,8 @@ private fun handleDownloadAction(
         is DownloadAction.Delete -> viewModel.deleteDownload(action.downloadId)
         is DownloadAction.RemoveFromApp -> viewModel.removeFromApp(action.downloadId)
         is DownloadAction.Redownload -> viewModel.redownloadVideo(action.downloadId, action.sameQuality)
+        is DownloadAction.Pause -> viewModel.pauseDownload(action.downloadId)
+        is DownloadAction.Resume -> viewModel.resumeDownload(action.downloadId)
     }
 }
 

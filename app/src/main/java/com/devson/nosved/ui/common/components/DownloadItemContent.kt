@@ -19,6 +19,7 @@ import com.devson.nosved.ui.model.humanSize
 fun DownloadItemContent(
     download: DownloadEntity,
     progress: DownloadProgress?,
+    onAction: (com.devson.nosved.ui.model.DownloadAction) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -78,10 +79,75 @@ fun DownloadItemContent(
             audioFormat = download.audioFormat
         )
 
-        // Progress info for active downloads
-        if (download.status == DownloadStatus.DOWNLOADING && progress != null) {
+        // Progress info for active/paused downloads
+        if (download.status == DownloadStatus.DOWNLOADING || download.status == DownloadStatus.PAUSED) {
             Spacer(modifier = Modifier.height(8.dp))
-            DownloadProgressInfo(progress = progress)
+            val currentProgress = progress?.progress ?: download.progress
+            val speed = progress?.speed ?: ""
+            val eta = progress?.eta ?: ""
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "${currentProgress}%" + if (download.status == DownloadStatus.PAUSED) " (Paused)" else "",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontWeight = FontWeight.Medium
+                    ),
+                    color = if (download.status == DownloadStatus.PAUSED) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.primary
+                )
+
+                if (download.status == DownloadStatus.DOWNLOADING) {
+                    Text(
+                        text = buildString {
+                            append(speed)
+                            if (eta.isNotEmpty()) {
+                                append(" • ETA $eta")
+                            }
+                        },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+
+        // Action buttons for active, paused, or queued downloads
+        if (download.status == DownloadStatus.DOWNLOADING ||
+            download.status == DownloadStatus.PAUSED ||
+            download.status == DownloadStatus.QUEUED) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (download.status == DownloadStatus.DOWNLOADING || download.status == DownloadStatus.QUEUED) {
+                    FilledTonalButton(
+                        onClick = { onAction(com.devson.nosved.ui.model.DownloadAction.Pause(download.id)) },
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                        modifier = Modifier.height(32.dp)
+                    ) {
+                        Text("Pause", fontSize = 12.sp)
+                    }
+                } else if (download.status == DownloadStatus.PAUSED) {
+                    Button(
+                        onClick = { onAction(com.devson.nosved.ui.model.DownloadAction.Resume(download.id)) },
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                        modifier = Modifier.height(32.dp)
+                    ) {
+                        Text("Resume", fontSize = 12.sp)
+                    }
+                }
+
+                OutlinedButton(
+                    onClick = { onAction(com.devson.nosved.ui.model.DownloadAction.Cancel(download.id)) },
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                    modifier = Modifier.height(32.dp)
+                ) {
+                    Text("Cancel", fontSize = 12.sp)
+                }
+            }
         }
 
         // Error message for failed downloads

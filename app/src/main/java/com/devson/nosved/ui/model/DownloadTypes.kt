@@ -20,4 +20,6 @@ sealed class DownloadAction {
     data class Delete(val downloadId: String) : DownloadAction()
     data class Redownload(val downloadId: String, val sameQuality: Boolean = true) : DownloadAction()
     data class RemoveFromApp(val downloadId: String) : DownloadAction()
+    data class Pause(val downloadId: String) : DownloadAction()
+    data class Resume(val downloadId: String) : DownloadAction()
 }

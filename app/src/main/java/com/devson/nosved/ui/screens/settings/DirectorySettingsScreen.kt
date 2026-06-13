@@ -22,6 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import android.widget.Toast
 import com.devson.nosved.viewmodel.SettingsViewModel
 import java.io.File
 
@@ -44,6 +45,7 @@ fun DirectorySettingsScreen(
     var showAudioFolderDialog by remember { mutableStateOf(false) }
     var showSubdirDialog by remember { mutableStateOf(false) }
     var showOutputTemplateDialog by remember { mutableStateOf(false) }
+    var showClearTempDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -170,6 +172,35 @@ fun DirectorySettingsScreen(
                     }
                 }
             }
+
+            // Maintenance Section
+            item {
+                Text(
+                    text = "Maintenance",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
+                )
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        DirectorySettingItem(
+                            title = "Clear temporary Files",
+                            subtitle = "Remove partial downloads to free up space",
+                            onClick = { showClearTempDialog = true }
+                        )
+                    }
+                }
+            }
         }
     }
 
@@ -221,6 +252,67 @@ fun DirectorySettingsScreen(
                 viewModel.setOutputTemplate(template)
                 showOutputTemplateDialog = false
             }
+        )
+    }
+
+    if (showClearTempDialog) {
+        AlertDialog(
+            onDismissRequest = { showClearTempDialog = false },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(32.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = "Clear Temporary Files",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Medium
+                )
+            },
+            text = {
+                Text(
+                    text = "Temporary Files can be used to resume cancelled/paused downloads. Are You Sure to delete all of these files?\n\nYou can access these files in storage/emulated/0/Download/Nosved/temp/",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        try {
+                            val tempDir = File("/storage/emulated/0/Download/Nosved/temp")
+                            val deleted = if (tempDir.exists()) {
+                                tempDir.deleteRecursively()
+                            } else {
+                                true
+                            }
+                            val created = File("/storage/emulated/0/Download/Nosved/temp").mkdirs()
+                            if (deleted && created) {
+                                Toast.makeText(context, "Temporary files cleared successfully", Toast.LENGTH_SHORT).show()
+                            } else {
+                                Toast.makeText(context, "Failed to clear temporary files", Toast.LENGTH_SHORT).show()
+                            }
+                        } catch (e: Exception) {
+                            Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+                        }
+                        showClearTempDialog = false
+                    }
+                ) {
+                    Text("Confirm", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearTempDialog = false }) {
+                    Text("Cancel")
+                }
+            },
+            shape = RoundedCornerShape(28.dp),
+            containerColor = MaterialTheme.colorScheme.surface,
+            tonalElevation = 6.dp
         )
     }
 }

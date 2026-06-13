@@ -7,9 +7,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Error
-import androidx.compose.material.icons.filled.ErrorOutline
-import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -83,6 +81,10 @@ fun DownloadItemCard(
                                     dialogMessage = "The downloaded file has been deleted or moved from your device storage."
                                     showOptionsDialog = true
                                 }
+                            } else if (download.status == DownloadStatus.DOWNLOADING || download.status == DownloadStatus.QUEUED) {
+                                onAction(DownloadAction.Pause(download.id))
+                            } else if (download.status == DownloadStatus.PAUSED) {
+                                onAction(DownloadAction.Resume(download.id))
                             } else if (isFailedOrCancelled) {
                                 dialogTitle = if (download.status == DownloadStatus.FAILED) "Download Failed" else "Download Cancelled"
                                 dialogMessage = if (download.status == DownloadStatus.FAILED) {
@@ -173,6 +175,23 @@ fun DownloadItemCard(
                         )
                     }
 
+                    DownloadStatus.PAUSED -> {
+                        DownloadPausedOverlay(
+                            modifier = Modifier.align(Alignment.Center)
+                        )
+
+                        // Progress bar at bottom
+                        LinearProgressIndicator(
+                            progress = { computedProgress / 100f },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(3.dp)
+                                .align(Alignment.BottomStart),
+                            color = MaterialTheme.colorScheme.secondary,
+                            trackColor = Color.White.copy(alpha = 0.3f)
+                        )
+                    }
+
                     DownloadStatus.FAILED -> {
                         StatusOverlay(
                             icon = Icons.Default.Error,
@@ -220,6 +239,7 @@ fun DownloadItemCard(
                 DownloadItemContent(
                     download = download,
                     progress = progress,
+                    onAction = onAction,
                     modifier = Modifier.weight(1f)
                 )
 
@@ -467,6 +487,25 @@ private fun StatusOverlay(
             imageVector = icon,
             contentDescription = null,
             tint = iconColor,
+            modifier = Modifier.size(24.dp)
+        )
+    }
+}
+
+@Composable
+private fun DownloadPausedOverlay(
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .size(64.dp)
+            .background(Color.Black.copy(alpha = 0.7f), CircleShape),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = Icons.Default.Pause,
+            contentDescription = "Paused",
+            tint = Color.White,
             modifier = Modifier.size(24.dp)
         )
     }
