@@ -13,6 +13,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.VideoFile
+import androidx.compose.material.icons.filled.HighQuality
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -692,89 +696,164 @@ fun QualitySettingsScreen(
         }
     }
 
-    // --- Bottom Sheets and Dialogs ---
-
-    // Preferred Audio Format Sheet
+    // Preferred Audio Format Dialog
     if (showAudioFormatSheet) {
-        ModalBottomSheet(
+        var selectedOption by remember { mutableStateOf(audioContainer.lowercase()) }
+        AlertDialog(
             onDismissRequest = { showAudioFormatSheet = false },
-            sheetState = rememberModalBottomSheetState()
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(24.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Text("Preferred Audio Format", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                listOf("default", "opus", "m4a").forEach { container ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                viewModel.setAudioContainer(container)
-                                showAudioFormatSheet = false
-                            }
-                            .padding(vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        RadioButton(
-                            selected = audioContainer.lowercase() == container,
-                            onClick = {
-                                viewModel.setAudioContainer(container)
-                                showAudioFormatSheet = false
-                            }
-                        )
-                        Spacer(Modifier.width(16.dp))
-                        Text(container.uppercase(), style = MaterialTheme.typography.bodyLarge)
-                    }
-                }
-                Spacer(Modifier.height(16.dp))
-            }
-        }
-    }
-
-    // Audio Quality Sheet
-    if (showAudioQualitySheet) {
-        ModalBottomSheet(
-            onDismissRequest = { showAudioQualitySheet = false }
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(24.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Text("Audio Quality", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                val qualities = listOf("unlimited", "320kbps", "256kbps", "192kbps", "128kbps", "96kbps", "64kbps", "48kbps")
-                LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 300.dp)) {
-                    items(qualities.size) { index ->
-                        val quality = qualities[index]
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.MusicNote,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(32.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = "Preferred audio format",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Medium,
+                    textAlign = TextAlign.Center
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "Preferred format when multiple are provided",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
+                    )
+                    listOf(
+                        "default" to "Not specified (default)",
+                        "opus" to "OPUS",
+                        "m4a" to "M4A"
+                    ).forEach { item ->
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable {
-                                    viewModel.setAudioQuality(quality)
-                                    showAudioQualitySheet = false
-                                }
-                                .padding(vertical = 12.dp),
+                                .clickable { selectedOption = item.first }
+                                .padding(vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             RadioButton(
-                                selected = audioQuality == quality,
-                                onClick = {
-                                    viewModel.setAudioQuality(quality)
-                                    showAudioQualitySheet = false
-                                }
+                                selected = selectedOption == item.first,
+                                onClick = { selectedOption = item.first }
                             )
-                            Spacer(Modifier.width(16.dp))
-                            Text(quality, style = MaterialTheme.typography.bodyLarge)
+                            Spacer(modifier = Modifier.width(16.dp))
+                            Text(item.second, style = MaterialTheme.typography.bodyLarge)
                         }
                     }
                 }
-                Spacer(Modifier.height(16.dp))
-            }
-        }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.setAudioContainer(selectedOption)
+                        showAudioFormatSheet = false
+                    }
+                ) {
+                    Text("Confirm")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAudioFormatSheet = false }) {
+                    Text("Cancel")
+                }
+            },
+            shape = RoundedCornerShape(28.dp),
+            containerColor = MaterialTheme.colorScheme.surface,
+            tonalElevation = 6.dp
+        )
+    }
+
+    // Audio Quality Dialog
+    if (showAudioQualitySheet) {
+        var selectedOption by remember { mutableStateOf(audioQuality) }
+        AlertDialog(
+            onDismissRequest = { showAudioQualitySheet = false },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.MusicNote,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(32.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = "Audio quality",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Medium,
+                    textAlign = TextAlign.Center
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "Limit the audio quality when multiple are present",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+                    )
+                    val qualities = listOf("unlimited", "320kbps", "256kbps", "192kbps", "128kbps", "96kbps", "64kbps", "48kbps")
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 280.dp)
+                    ) {
+                        items(qualities.size) { index ->
+                            val quality = qualities[index]
+                            val displayLabel = when (quality) {
+                                "unlimited" -> "Best quality"
+                                else -> quality
+                            }
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { selectedOption = quality }
+                                    .padding(vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(
+                                    selected = selectedOption == quality,
+                                    onClick = { selectedOption = quality }
+                                )
+                                Spacer(modifier = Modifier.width(16.dp))
+                                Text(displayLabel, style = MaterialTheme.typography.bodyLarge)
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.setAudioQuality(selectedOption)
+                        showAudioQualitySheet = false
+                    }
+                ) {
+                    Text("Confirm")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAudioQualitySheet = false }) {
+                    Text("Cancel")
+                }
+            },
+            shape = RoundedCornerShape(28.dp),
+            containerColor = MaterialTheme.colorScheme.surface,
+            tonalElevation = 6.dp
+        )
     }
 
     // Convert Audio Format Sheet
@@ -816,91 +895,168 @@ fun QualitySettingsScreen(
         }
     }
 
-    // Preferred Video Format Sheet
+    // Preferred Video Format Dialog
     if (showVideoFormatSheet) {
-        ModalBottomSheet(
-            onDismissRequest = { showVideoFormatSheet = false }
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(24.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Text("Preferred Video Format", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                listOf("quality" to "Quality (WEBM)", "legacy" to "Legacy (MP4)").forEach { item ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                viewModel.setPreferredVideoFormat(item.first)
-                                showVideoFormatSheet = false
-                            }
-                            .padding(vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        RadioButton(
-                            selected = preferredVideoFormat == item.first,
-                            onClick = {
-                                viewModel.setPreferredVideoFormat(item.first)
-                                showVideoFormatSheet = false
-                            }
-                        )
-                        Spacer(Modifier.width(16.dp))
-                        Text(item.second, style = MaterialTheme.typography.bodyLarge)
-                    }
-                }
-                Spacer(Modifier.height(16.dp))
-            }
-        }
-    }
-
-    // Video Quality Sheet
-    if (showVideoQualitySheet) {
-        ModalBottomSheet(
-            onDismissRequest = { showVideoQualitySheet = false }
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(24.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Text("Video Quality", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                val qualities = listOf("best", "2160p", "1440p", "1080p", "720p", "480p", "360p", "240p", "144p", "worst")
-                LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 300.dp)) {
-                    items(qualities.size) { index ->
-                        val quality = qualities[index]
+        var selectedOption by remember { mutableStateOf(preferredVideoFormat) }
+        AlertDialog(
+            onDismissRequest = { showVideoFormatSheet = false },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.VideoFile,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(32.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = "Preferred video format",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Medium,
+                    textAlign = TextAlign.Center
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    listOf(
+                        "legacy" to ("Legacy" to "Prefer MP4(H.264) formats for sharing to other apps"),
+                        "quality" to ("Quality" to "Prefer AV1, VP9 or H.265 formats for watching in compatible apps")
+                    ).forEach { item ->
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable {
-                                    viewModel.setVideoQuality(quality)
-                                    showVideoQualitySheet = false
-                                }
-                                .padding(vertical = 12.dp),
+                                .clickable { selectedOption = item.first }
+                                .padding(vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             RadioButton(
-                                selected = videoQuality == quality,
-                                onClick = {
-                                    viewModel.setVideoQuality(quality)
-                                    showVideoQualitySheet = false
-                                }
+                                selected = selectedOption == item.first,
+                                onClick = { selectedOption = item.first }
                             )
-                            Spacer(Modifier.width(16.dp))
-                            val displayLabel = when (quality) {
-                                "best" -> "Best Quality"
-                                "worst" -> "Lowest Quality"
-                                else -> quality
+                            Spacer(modifier = Modifier.width(16.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = item.second.first,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Text(
+                                    text = item.second.second,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
                             }
-                            Text(displayLabel, style = MaterialTheme.typography.bodyLarge)
                         }
                     }
                 }
-                Spacer(Modifier.height(16.dp))
-            }
-        }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.setPreferredVideoFormat(selectedOption)
+                        showVideoFormatSheet = false
+                    }
+                ) {
+                    Text("Confirm")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showVideoFormatSheet = false }) {
+                    Text("Cancel")
+                }
+            },
+            shape = RoundedCornerShape(28.dp),
+            containerColor = MaterialTheme.colorScheme.surface,
+            tonalElevation = 6.dp
+        )
+    }
+
+    // Video Quality Dialog
+    if (showVideoQualitySheet) {
+        var selectedOption by remember { mutableStateOf(videoQuality) }
+        AlertDialog(
+            onDismissRequest = { showVideoQualitySheet = false },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.HighQuality,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(32.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = "Video quality",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Medium,
+                    textAlign = TextAlign.Center
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "Limit the video quality when multiple are present",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+                    )
+                    val qualities = listOf("best", "2160p", "1440p", "1080p", "720p", "480p", "360p", "240p", "144p", "worst")
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 280.dp)
+                    ) {
+                        items(qualities.size) { index ->
+                            val quality = qualities[index]
+                            val displayLabel = when (quality) {
+                                "best" -> "Best quality"
+                                "worst" -> "Lowest quality"
+                                else -> quality
+                            }
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { selectedOption = quality }
+                                    .padding(vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(
+                                    selected = selectedOption == quality,
+                                    onClick = { selectedOption = quality }
+                                )
+                                Spacer(modifier = Modifier.width(16.dp))
+                                Text(displayLabel, style = MaterialTheme.typography.bodyLarge)
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.setVideoQuality(selectedOption)
+                        showVideoQualitySheet = false
+                    }
+                ) {
+                    Text("Confirm")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showVideoQualitySheet = false }) {
+                    Text("Cancel")
+                }
+            },
+            shape = RoundedCornerShape(28.dp),
+            containerColor = MaterialTheme.colorScheme.surface,
+            tonalElevation = 6.dp
+        )
     }
 
     // Format Sorting Dialog

@@ -132,6 +132,7 @@ fun MainContent(mainViewModel: MainViewModel) {
             composable(Screen.AppVersion.route) {
                 AppVersionScreen(
                     onNavigateBack = { navController.popBackStack() },
+                    onNavigateToCredits = { navController.navigate(Screen.Credits.route) },
                     viewModel = mainViewModel
                 )
             }
@@ -141,7 +142,6 @@ fun MainContent(mainViewModel: MainViewModel) {
                     onNavigateToQualitySettings = { navController.navigate(Screen.QualitySettings.route) },
                     onNavigateToAdvancedSettings = { navController.navigate(Screen.AdvancedSettings.route) },
                     onNavigateToAppVersion = { navController.navigate(Screen.AppVersion.route) },
-                    onNavigateToCredits = { navController.navigate(Screen.Credits.route) },
                     onNavigateToAppearanceSettings = { navController.navigate(Screen.AppearanceSettings.route) },
                     onNavigateToDirectorySettings = { navController.navigate(Screen.DirectorySettings.route) }
                 )

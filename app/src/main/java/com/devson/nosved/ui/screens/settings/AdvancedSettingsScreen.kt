@@ -32,7 +32,6 @@ fun AdvancedSettingsScreen(
     val qualityPrefs = remember { QualityPreferences(context) }
     val scope = rememberCoroutineScope()
 
-    val ytdlpUpdateChannel by viewModel.ytdlpUpdateChannel.collectAsState()
     val ytdlpUpdateInterval by viewModel.ytdlpUpdateInterval.collectAsState()
     val downloadNotification by viewModel.downloadNotification.collectAsState()
     val configureBeforeDownload by viewModel.configureBeforeDownload.collectAsState()
@@ -50,15 +49,6 @@ fun AdvancedSettingsScreen(
     val keepVideoAfterAudioExtraction by qualityPrefs.keepVideoAfterAudioExtraction.collectAsState(initial = false)
     val enableCookies by qualityPrefs.enableCookies.collectAsState(initial = false)
     val maxDownloadRetries by qualityPrefs.maxDownloadRetries.collectAsState(initial = 3)
-
-    val ytdlpVersion = remember {
-        try {
-            val app = context.applicationContext as android.app.Application
-            YtDlpUpdater(app).getCurrentVersion()
-        } catch (e: Exception) {
-            "Unknown"
-        }
-    }
 
     var showUpdateIntervalDropdown by remember { mutableStateOf(false) }
 
@@ -112,48 +102,7 @@ fun AdvancedSettingsScreen(
                         modifier = Modifier.padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        // YT-DLP Update Channel
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 4.dp, vertical = 4.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "YT-DLP Update Channel",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    fontWeight = FontWeight.Medium
-                                )
-                                Text(
-                                    text = "v$ytdlpVersion",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                FilterChip(
-                                    selected = ytdlpUpdateChannel == "STABLE",
-                                    onClick = { viewModel.setYtdlpUpdateChannel("STABLE") },
-                                    label = { Text("Stable") }
-                                )
-                                FilterChip(
-                                    selected = ytdlpUpdateChannel == "NIGHTLY",
-                                    onClick = { viewModel.setYtdlpUpdateChannel("NIGHTLY") },
-                                    label = { Text("Nightly") }
-                                )
-                            }
-                        }
 
-                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
 
                         // Auto Update Check Dropdown
                         Row(

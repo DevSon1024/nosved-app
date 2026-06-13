@@ -31,7 +31,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
-import java.text.DecimalFormat
 
 sealed class DialogState {
     object None : DialogState()
@@ -45,20 +44,13 @@ fun SettingsScreen(
     onNavigateToQualitySettings: () -> Unit,
     onNavigateToAdvancedSettings: () -> Unit,
     onNavigateToAppVersion: () -> Unit,
-    onNavigateToCredits: () -> Unit,
     onNavigateToAppearanceSettings: () -> Unit,
     onNavigateToDirectorySettings: () -> Unit
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    var storageInfo by remember { mutableStateOf("Calculating..." to "...") }
 
-    LaunchedEffect(Unit) {
-        storageInfo = withContext(Dispatchers.IO) {
-            getStorageInfoOptimized(context)
-        }
-    }
 
     Scaffold(
         topBar = {
@@ -149,16 +141,6 @@ fun SettingsScreen(
                 item {
                     SettingsGroupCard {
                         SettingsItemRow(
-                            icon = Icons.Default.Storage,
-                            title = "Storage Usage",
-                            subtitle = "Used: ${storageInfo.first} • Available: ${storageInfo.second}",
-                            onClick = { }
-                        )
-                        HorizontalDivider(
-                            modifier = Modifier.padding(start = 72.dp),
-                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                        )
-                        SettingsItemRow(
                             icon = Icons.Default.CleaningServices,
                             title = "Clear Cache",
                             subtitle = "Remove temporary files",
@@ -166,9 +148,6 @@ fun SettingsScreen(
                                 scope.launch {
                                     withContext(Dispatchers.IO) {
                                         clearAppCache(context)
-                                    }
-                                    storageInfo = withContext(Dispatchers.IO) {
-                                        getStorageInfoOptimized(context)
                                     }
                                     showToast(context, "Cache cleared!")
                                 }
@@ -185,38 +164,8 @@ fun SettingsScreen(
                         SettingsItemRow(
                             icon = Icons.Default.Info,
                             title = "App Version",
-                            subtitle = "Version info and updates",
+                            subtitle = "Version, updates, repo, and credits",
                             onClick = onNavigateToAppVersion
-                        )
-                        HorizontalDivider(
-                            modifier = Modifier.padding(start = 72.dp),
-                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                        )
-                        SettingsItemRow(
-                            icon = Icons.Default.Favorite,
-                            title = "Credits",
-                            subtitle = "Acknowledgements and licenses",
-                            onClick = onNavigateToCredits
-                        )
-                        HorizontalDivider(
-                            modifier = Modifier.padding(start = 72.dp),
-                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                        )
-                        SettingsItemRow(
-                            icon = Icons.Default.Code,
-                            title = "Official Repo",
-                            subtitle = "View on GitHub",
-                            onClick = { openGitHub(context) }
-                        )
-                        HorizontalDivider(
-                            modifier = Modifier.padding(start = 72.dp),
-                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                        )
-                        SettingsItemRow(
-                            icon = Icons.Default.BugReport,
-                            title = "Report Issue",
-                            subtitle = "Found a bug? Let us know",
-                            onClick = { openIssueTracker(context) }
                         )
                     }
                 }
@@ -426,30 +375,6 @@ fun getCurrentDownloadFolder(context: Context): String {
     return "${Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)}/nosved"
 }
 
-suspend fun getStorageInfoOptimized(context: Context): Pair<String, String> {
-    return withContext(Dispatchers.IO) {
-        try {
-            val downloadDir = File(getCurrentDownloadFolder(context))
-            val usedSpace = if (downloadDir.exists()) {
-                downloadDir.walkTopDown()
-                    .filter { it.isFile }
-                    .map { it.length() }
-                    .sum()
-            } else 0L
-
-            val availableSpace = Environment.getExternalStorageDirectory().freeSpace
-            val df = DecimalFormat("#.#")
-
-            val usedMB = df.format(usedSpace / (1024.0 * 1024.0))
-            val availableGB = df.format(availableSpace / (1024.0 * 1024.0 * 1024.0))
-
-            "${usedMB}MB" to "${availableGB}GB"
-        } catch (e: Exception) {
-            "Error" to "Error"
-        }
-    }
-}
-
 fun clearAppCache(context: Context) {
     try {
         context.cacheDir.deleteRecursively()
@@ -469,12 +394,4 @@ fun openDownloadFolderInFileManager(context: Context, folderPath: String) {
     }
 }
 
-fun openGitHub(context: Context) {
-    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/DevSon1024/nosved-app"))
-    context.startActivity(intent)
-}
-
-fun openIssueTracker(context: Context) {
-    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/DevSon1024/nosved-app/issues"))
-    context.startActivity(intent)
-}
+// Help links moved to AppVersionScreen.kt
