@@ -28,11 +28,17 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.devson.nosved.viewmodel.MainViewModel
 import com.devson.nosved.viewmodel.SettingsViewModel
 import com.devson.nosved.util.YtDlpUpdater
+import com.devson.nosved.util.YtDlpUpdateInterval
 import com.yausername.youtubedl_android.YoutubeDL
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import org.json.JSONObject
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.ui.graphics.Color
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -51,6 +57,59 @@ fun AppVersionScreen(
     var isUpdatingYtdlp by remember { mutableStateOf(false) }
 
     val ytdlpUpdateChannel by settingsViewModel.ytdlpUpdateChannel.collectAsState()
+    val ytdlpUpdateInterval by settingsViewModel.ytdlpUpdateInterval.collectAsState()
+
+    var remoteVersion by remember { mutableStateOf<String?>(null) }
+    var isCheckingForUpdate by remember { mutableStateOf(false) }
+    var showUpdateIntervalDialog by remember { mutableStateOf(false) }
+
+    suspend fun fetchLatestRemoteVersion(channel: String): String? {
+        return withContext(Dispatchers.IO) {
+            val client = OkHttpClient()
+            val repo = if (channel == "NIGHTLY") "yt-dlp/yt-dlp-nightly-builds" else "yt-dlp/yt-dlp"
+            val url = "https://api.github.com/repos/$repo/releases/latest"
+            val request = Request.Builder()
+                .url(url)
+                .header("User-Agent", "Nosved-App")
+                .build()
+            try {
+                client.newCall(request).execute().use { response ->
+                    if (response.isSuccessful) {
+                        val body = response.body?.string()
+                        if (body != null) {
+                            val json = JSONObject(body)
+                            json.optString("tag_name")?.trim()
+                        } else {
+                            null
+                        }
+                    } else {
+                        null
+                    }
+                }
+            } catch (e: Exception) {
+                null
+            }
+        }
+    }
+
+    fun checkRemoteVersion() {
+        scope.launch {
+            isCheckingForUpdate = true
+            try {
+                remoteVersion = fetchLatestRemoteVersion(ytdlpUpdateChannel)
+            } catch (e: Exception) {
+                remoteVersion = null
+            } finally {
+                isCheckingForUpdate = false
+            }
+        }
+    }
+
+    val isLatestVersion = remember(ytdlpVersion, remoteVersion) {
+        val cleanLocal = ytdlpVersion.trim()
+        val cleanRemote = remoteVersion?.trim()
+        cleanRemote != null && cleanLocal == cleanRemote
+    }
 
     // Create YtDlpUpdater instance
     val ytdlpUpdater = remember { YtDlpUpdater(context.applicationContext as Application) }
@@ -91,9 +150,10 @@ fun AppVersionScreen(
         }
     }
 
-    // Load version information on first composition
-    LaunchedEffect(Unit) {
+    // Load version information on channel change
+    LaunchedEffect(ytdlpUpdateChannel) {
         loadVersionInfo()
+        checkRemoteVersion()
     }
 
     Scaffold(
@@ -267,42 +327,106 @@ fun AppVersionScreen(
 
                         Spacer(modifier = Modifier.height(16.dp))
 
-                        // Manual Update Action Button
-                        Button(
-                            onClick = {
-                                isUpdatingYtdlp = true
-                                scope.launch {
-                                    try {
-                                        showToastAppVersion(context, "Updating YT-DLP...")
-                                        withContext(Dispatchers.IO) {
-                                            ytdlpUpdater.checkAndUpdate(force = true)
-                                        }
-                                        delay(1500)
-                                        loadVersionInfo()
-                                        showToastAppVersion(context, "YT-DLP updated successfully!")
-                                    } catch (e: Exception) {
-                                        showToastAppVersion(context, "Update failed: ${e.message}")
-                                    } finally {
-                                        isUpdatingYtdlp = false
-                                    }
-                                }
-                            },
-                            enabled = !isUpdatingYtdlp,
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp)
+                        // Auto Update Check Row
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { showUpdateIntervalDialog = true }
+                                .padding(vertical = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            if (isUpdatingYtdlp) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(18.dp),
-                                    color = MaterialTheme.colorScheme.onPrimary,
-                                    strokeWidth = 2.dp
+                            Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
+                                Text(
+                                    text = "Auto Update Check",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Text(
+                                    text = "Check for engine updates automatically",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = ytdlpUpdateInterval.displayName,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Icon(
+                                    Icons.Default.ChevronRight,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        if (!isLatestVersion) {
+                            // Manual Update Action Button
+                            Button(
+                                onClick = {
+                                    isUpdatingYtdlp = true
+                                    scope.launch {
+                                        try {
+                                            showToastAppVersion(context, "Updating YT-DLP...")
+                                            withContext(Dispatchers.IO) {
+                                                ytdlpUpdater.checkAndUpdate(force = true)
+                                            }
+                                            delay(1500)
+                                            loadVersionInfo()
+                                            checkRemoteVersion()
+                                            showToastAppVersion(context, "YT-DLP updated successfully!")
+                                        } catch (e: Exception) {
+                                            showToastAppVersion(context, "Update failed: ${e.message}")
+                                        } finally {
+                                            isUpdatingYtdlp = false
+                                        }
+                                    }
+                                },
+                                enabled = !isUpdatingYtdlp,
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                if (isUpdatingYtdlp) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(18.dp),
+                                        color = MaterialTheme.colorScheme.onPrimary,
+                                        strokeWidth = 2.dp
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Updating...")
+                                } else {
+                                    Icon(Icons.Default.SystemUpdate, contentDescription = null)
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Update Engine")
+                                }
+                            }
+                        } else {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CheckCircle,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(18.dp)
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("Updating...")
-                            } else {
-                                Icon(Icons.Default.SystemUpdate, contentDescription = null)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Update Engine")
+                                Text(
+                                    text = "Engine is up to date",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.Medium
+                                )
                             }
                         }
                     }
@@ -325,7 +449,11 @@ fun AppVersionScreen(
                         containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
                     )
                 ) {
-                    Column {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(20.dp))
+                    ) {
                         AppVersionItemRow(
                             icon = Icons.Default.Favorite,
                             title = "Credits",
@@ -392,7 +520,66 @@ fun AppVersionScreen(
                 )
             }
         }
+    if (showUpdateIntervalDialog) {
+        AlertDialog(
+            onDismissRequest = { showUpdateIntervalDialog = false },
+            title = { Text("Auto Update Check", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "Select how frequently the app checks for yt-dlp engine updates automatically.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    YtDlpUpdateInterval.entries.forEach { interval ->
+                        val isSelected = interval == ytdlpUpdateInterval
+                        Surface(
+                            onClick = {
+                                settingsViewModel.setYtdlpUpdateInterval(interval)
+                                showUpdateIntervalDialog = false
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                            border = if (isSelected) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = interval.displayName,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                                )
+                                RadioButton(
+                                    selected = isSelected,
+                                    onClick = {
+                                        settingsViewModel.setYtdlpUpdateInterval(interval)
+                                        showUpdateIntervalDialog = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showUpdateIntervalDialog = false }) {
+                    Text("Dismiss")
+                }
+            }
+        )
     }
+}
 }
 
 @Composable

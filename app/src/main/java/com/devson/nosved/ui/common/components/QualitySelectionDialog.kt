@@ -534,6 +534,7 @@ fun QualitySelectionDialog(
                                     color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
                                     shape = RoundedCornerShape(12.dp)
                                 )
+                                .clip(RoundedCornerShape(12.dp))
                                 .clickable { formatMenuExpanded = true }
                                 .padding(horizontal = 16.dp, vertical = 12.dp)
                         ) {
@@ -605,6 +606,7 @@ fun QualitySelectionDialog(
                                     color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
                                     shape = RoundedCornerShape(12.dp)
                                 )
+                                .clip(RoundedCornerShape(12.dp))
                                 .clickable { qualityMenuExpanded = true }
                                 .padding(horizontal = 16.dp, vertical = 12.dp)
                         ) {
@@ -693,6 +695,7 @@ fun QualitySelectionDialog(
                                     color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
                                     shape = RoundedCornerShape(12.dp)
                                 )
+                                .clip(RoundedCornerShape(12.dp))
                                 .clickable { formatMenuExpanded = true }
                                 .padding(horizontal = 16.dp, vertical = 12.dp)
                         ) {
@@ -770,6 +773,7 @@ fun QualitySelectionDialog(
                                     color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
                                     shape = RoundedCornerShape(12.dp)
                                 )
+                                .clip(RoundedCornerShape(12.dp))
                                 .clickable { qualityMenuExpanded = true }
                                 .padding(horizontal = 16.dp, vertical = 12.dp)
                         ) {

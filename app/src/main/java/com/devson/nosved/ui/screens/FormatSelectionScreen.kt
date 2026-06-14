@@ -66,15 +66,27 @@ fun FormatSelectionScreen(
         var editTitleText by remember { mutableStateOf(customTitle) }
         AlertDialog(
             onDismissRequest = { showEditDialog = false },
-            title = { Text("Edit Title") },
+            title = { Text("Edit Title", fontWeight = FontWeight.Bold) },
             text = {
-                OutlinedTextField(
-                    value = editTitleText,
-                    onValueChange = { editTitleText = it },
+                Column(
                     modifier = Modifier.fillMaxWidth(),
-                    singleLine = false,
-                    maxLines = 3
-                )
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "Customize the title of the video before downloading.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    OutlinedTextField(
+                        value = editTitleText,
+                        onValueChange = { editTitleText = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = false,
+                        maxLines = 3,
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                }
             },
             confirmButton = {
                 TextButton(
@@ -479,6 +491,7 @@ private fun FssFormatCard(
     Card(
         modifier = modifier
             .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
             .clickable { onClick() }
             .border(1.dp, borderColor, RoundedCornerShape(12.dp)),
         shape = RoundedCornerShape(12.dp),

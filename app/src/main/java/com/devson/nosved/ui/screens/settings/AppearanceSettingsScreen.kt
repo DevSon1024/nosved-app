@@ -6,6 +6,7 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -21,6 +22,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -100,80 +102,91 @@ fun AppearanceSettingsScreen(
 
             //  THEME section 
             AppearanceSectionLabel(stringResource(R.string.appearance_theme))
-            AppearanceCard {
-                Column(
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                // Theme Selection Card
+                Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 14.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Text(
-                        text = stringResource(R.string.appearance_dark_theme),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
+                        .border(
+                            BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                            RoundedCornerShape(12.dp)
+                        ),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
                     )
-                    
-                    SingleChoiceSegmentedButtonRow(
-                        modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 14.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        val options = listOf(
-                            stringResource(R.string.appearance_light),
-                            stringResource(R.string.appearance_dark),
-                            stringResource(R.string.appearance_system_default)
+                        Text(
+                            text = stringResource(R.string.appearance_dark_theme),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold
                         )
                         
-                        options.forEachIndexed { index, label ->
-                            val isSelected = when (index) {
-                                0 -> isDark == false
-                                1 -> isDark == true
-                                else -> isDark == null
-                            }
-                            SegmentedButton(
-                                selected = isSelected,
-                                onClick = {
-                                    when (index) {
-                                        0 -> settingsViewModel.setDarkTheme(false)
-                                        1 -> settingsViewModel.setDarkTheme(true)
-                                        2 -> settingsViewModel.resetDarkTheme()
-                                    }
-                                },
-                                shape = SegmentedButtonDefaults.itemShape(index = index, count = options.size)
-                            ) {
-                                Text(label)
+                        SingleChoiceSegmentedButtonRow(
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            val options = listOf(
+                                stringResource(R.string.appearance_light),
+                                stringResource(R.string.appearance_dark),
+                                stringResource(R.string.appearance_system_default)
+                            )
+                            
+                            options.forEachIndexed { index, label ->
+                                val isSelected = when (index) {
+                                    0 -> isDark == false
+                                    1 -> isDark == true
+                                    else -> isDark == null
+                                }
+                                SegmentedButton(
+                                    selected = isSelected,
+                                    onClick = {
+                                        when (index) {
+                                            0 -> settingsViewModel.setDarkTheme(false)
+                                            1 -> settingsViewModel.setDarkTheme(true)
+                                            2 -> settingsViewModel.resetDarkTheme()
+                                        }
+                                    },
+                                    shape = SegmentedButtonDefaults.itemShape(index = index, count = options.size)
+                                ) {
+                                    Text(label)
+                                }
                             }
                         }
                     }
                 }
                 
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    AppearanceDivider()
-                    AppearanceToggleRow(
-                        icon      = Icons.Default.Palette,
+                    AppearanceSettingCard(
                         title     = stringResource(R.string.appearance_dynamic_colour),
                         subtitle  = stringResource(R.string.appearance_dynamic_colour_desc),
                         checked   = dynamicColor,
-                        onCheckedChange = { settingsViewModel.setDynamicColor(it) }
+                        onToggle = { settingsViewModel.setDynamicColor(it) }
                     )
                 }
 
-                AppearanceDivider()
                 if (isEffectivelyDark) {
-                    AppearanceToggleRow(
-                        icon      = Icons.Default.Brightness1,
+                    AppearanceSettingCard(
                         title     = "AMOLED Theme",
                         subtitle  = "Pure black background for dark mode",
                         checked   = isAmoledTheme,
-                        onCheckedChange = { settingsViewModel.setAmoledTheme(it) }
+                        onToggle = { settingsViewModel.setAmoledTheme(it) }
                     )
-                    AppearanceDivider()
                 }
 
-                AppearanceToggleRow(
-                    icon      = Icons.Default.WebAsset,
+                AppearanceSettingCard(
                     title     = "Transparent Navigation Buttons",
                     subtitle  = "Content scrolls behind the system navigation buttons",
                     checked   = navBarTransparent,
-                    onCheckedChange = { settingsViewModel.setNavBarTransparent(it) }
+                    onToggle = { settingsViewModel.setNavBarTransparent(it) }
                 )
             }
         }
@@ -381,66 +394,62 @@ private fun AppearanceSectionLabel(label: String) {
 }
 
 @Composable
-private fun AppearanceCard(content: @Composable ColumnScope.() -> Unit) {
-    Surface(
-        modifier       = Modifier.fillMaxWidth(),
-        shape          = RoundedCornerShape(16.dp),
-        color          = MaterialTheme.colorScheme.surfaceContainerHigh,
-        tonalElevation = 2.dp
-    ) {
-        Column(content = content)
-    }
-}
-
-@Composable
-private fun AppearanceDivider() {
-    HorizontalDivider(
-        modifier = Modifier.padding(start = 56.dp),
-        color    = MaterialTheme.colorScheme.outlineVariant
-    )
-}
-
-@Composable
-private fun AppearanceToggleRow(
-    icon: ImageVector,
+private fun AppearanceSettingCard(
     title: String,
     subtitle: String,
     checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit
+    enabled: Boolean = true,
+    modifier: Modifier = Modifier,
+    onToggle: (Boolean) -> Unit
 ) {
-    Row(
-        modifier              = Modifier
+    Card(
+        modifier = modifier
             .fillMaxWidth()
-            .clickable { onCheckedChange(!checked) }
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalAlignment     = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(16.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .then(if (enabled) Modifier.clickable { onToggle(!checked) } else Modifier)
+            .alpha(if (enabled) 1f else 0.38f)
+            .border(
+                BorderStroke(
+                    1.dp,
+                    if (checked && enabled) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                    else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                ),
+                RoundedCornerShape(12.dp)
+            ),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (checked && enabled) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f)
+            else MaterialTheme.colorScheme.surface
+        )
     ) {
-        Box(
-            modifier         = Modifier
-                .size(40.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.secondaryContainer),
-            contentAlignment = Alignment.Center
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                imageVector        = icon,
-                contentDescription = null,
-                modifier           = Modifier.size(20.dp),
-                tint               = MaterialTheme.colorScheme.onSecondaryContainer
+            Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Switch(
+                checked = checked,
+                onCheckedChange = onToggle,
+                enabled = enabled
             )
         }
-
-        Column(modifier = Modifier.weight(1f)) {
-            Text(text = title, style = MaterialTheme.typography.bodyLarge)
-            Text(
-                text  = subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
+
 

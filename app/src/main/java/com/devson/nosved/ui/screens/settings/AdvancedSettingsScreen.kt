@@ -1,25 +1,25 @@
 package com.devson.nosved.ui.screens.settings
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.devson.nosved.data.QualityPreferences
 import com.devson.nosved.viewmodel.SettingsViewModel
-import com.devson.nosved.util.YtDlpUpdateInterval
-import com.devson.nosved.util.YtDlpUpdater
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -32,7 +32,6 @@ fun AdvancedSettingsScreen(
     val qualityPrefs = remember { QualityPreferences(context) }
     val scope = rememberCoroutineScope()
 
-    val ytdlpUpdateInterval by viewModel.ytdlpUpdateInterval.collectAsState()
     val downloadNotification by viewModel.downloadNotification.collectAsState()
     val configureBeforeDownload by viewModel.configureBeforeDownload.collectAsState()
     val saveThumbnail by viewModel.saveThumbnail.collectAsState()
@@ -49,8 +48,6 @@ fun AdvancedSettingsScreen(
     val keepVideoAfterAudioExtraction by qualityPrefs.keepVideoAfterAudioExtraction.collectAsState(initial = false)
     val enableCookies by qualityPrefs.enableCookies.collectAsState(initial = false)
     val maxDownloadRetries by qualityPrefs.maxDownloadRetries.collectAsState(initial = 3)
-
-    var showUpdateIntervalDropdown by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -76,7 +73,7 @@ fun AdvancedSettingsScreen(
                 .fillMaxSize(),
             contentPadding = PaddingValues(
                 start = 16.dp,
-                top = 16.dp,
+                top = 8.dp,
                 end = 16.dp,
                 bottom = paddingValues.calculateBottomPadding() + 16.dp
             ),
@@ -84,268 +81,156 @@ fun AdvancedSettingsScreen(
         ) {
             // General Section
             item {
-                Text(
-                    text = "General",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
-                )
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = "General",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
                     )
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-
-
-                        // Auto Update Check Dropdown
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { showUpdateIntervalDropdown = true }
-                                .padding(vertical = 12.dp, horizontal = 4.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
-                                Text(
-                                    "Auto Update Check",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    fontWeight = FontWeight.Medium
-                                )
-                                Text(
-                                    "Check for updates automatically",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            Box {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(
-                                        text = ytdlpUpdateInterval.displayName,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.primary,
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                    Icon(
-                                        Icons.Default.ArrowDropDown,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary
-                                    )
-                                }
-                                DropdownMenu(
-                                    expanded = showUpdateIntervalDropdown,
-                                    onDismissRequest = { showUpdateIntervalDropdown = false }
-                                ) {
-                                    YtDlpUpdateInterval.entries.forEach { interval ->
-                                        DropdownMenuItem(
-                                            text = { Text(interval.displayName) },
-                                            onClick = {
-                                                viewModel.setYtdlpUpdateInterval(interval)
-                                                showUpdateIntervalDropdown = false
-                                            }
-                                        )
-                                    }
-                                }
-                            }
-                        }
-
-                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
-
-                        AdvancedSettingRow(
-                            title = "Download Notification",
-                            subtitle = "Show notification for download progress",
-                            checked = downloadNotification,
-                            onToggle = { viewModel.setDownloadNotification(it) }
-                        )
-
-                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
-
-                        AdvancedSettingRow(
-                            title = "Configure Before Download",
-                            subtitle = "Show format chooser before downloading",
-                            checked = configureBeforeDownload,
-                            onToggle = { viewModel.setConfigureBeforeDownload(it) }
-                        )
-
-                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
-
-                        AdvancedSettingRow(
-                            title = "Save Thumbnail",
-                            subtitle = "Download video thumbnail file",
-                            checked = saveThumbnail,
-                            onToggle = { viewModel.setSaveThumbnail(it) }
-                        )
-
-                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
-
-                        AdvancedSettingRow(
-                            title = "Detailed Output",
-                            subtitle = "Enable verbose yt-dlp logging",
-                            checked = detailedOutput,
-                            onToggle = { viewModel.setDetailedOutput(it) }
-                        )
-                    }
+                    AdvancedSettingCard(
+                        title = "Download Notification",
+                        subtitle = "Show notification for download progress",
+                        checked = downloadNotification,
+                        onToggle = { viewModel.setDownloadNotification(it) }
+                    )
+                    AdvancedSettingCard(
+                        title = "Configure Before Download",
+                        subtitle = "Show format chooser before downloading",
+                        checked = configureBeforeDownload,
+                        onToggle = { viewModel.setConfigureBeforeDownload(it) }
+                    )
+                    AdvancedSettingCard(
+                        title = "Save Thumbnail",
+                        subtitle = "Download video thumbnail file",
+                        checked = saveThumbnail,
+                        onToggle = { viewModel.setSaveThumbnail(it) }
+                    )
+                    AdvancedSettingCard(
+                        title = "Detailed Output",
+                        subtitle = "Enable verbose yt-dlp logging",
+                        checked = detailedOutput,
+                        onToggle = { viewModel.setDetailedOutput(it) }
+                    )
                 }
             }
 
             // Privacy Section
             item {
-                Text(
-                    text = "Privacy",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
-                )
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = "Privacy",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
                     )
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        AdvancedSettingRow(
-                            title = "Incognito Mode",
-                            subtitle = "Do not save download history in app",
-                            checked = incognitoMode,
-                            onToggle = { viewModel.setIncognitoMode(it) }
-                        )
-
-                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
-
-                        AdvancedSettingRow(
-                            title = "Disable Preview",
-                            subtitle = "Do not fetch/display video thumbnails in UI",
-                            checked = disablePreview,
-                            onToggle = { viewModel.setDisablePreview(it) }
-                        )
-                    }
+                    AdvancedSettingCard(
+                        title = "Incognito Mode",
+                        subtitle = "Do not save download history in app",
+                        checked = incognitoMode,
+                        onToggle = { viewModel.setIncognitoMode(it) }
+                    )
+                    AdvancedSettingCard(
+                        title = "Disable Preview",
+                        subtitle = "Do not fetch/display video thumbnails in UI",
+                        checked = disablePreview,
+                        onToggle = { viewModel.setDisablePreview(it) }
+                    )
                 }
             }
 
             // Downloader Section
             item {
-                Text(
-                    text = "Downloader",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
-                )
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = "Downloader",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
                     )
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        AdvancedSettingRow(
-                            title = "Download Playlist",
-                            subtitle = "Download full playlist if URL contains one",
-                            checked = downloadPlaylist,
-                            onToggle = { viewModel.setDownloadPlaylist(it) }
-                        )
-
-                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
-
-                        AdvancedSettingRow(
-                            title = "Download Archive",
-                            subtitle = "Only download videos not listed in archive file",
-                            checked = downloadArchive,
-                            onToggle = { viewModel.setDownloadArchive(it) }
-                        )
-
-                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
-
-                        AdvancedSettingRow(
-                            title = "SponsorBlock",
-                            subtitle = "Skip sponsored segments automatically",
-                            checked = enableSponsorsBlock,
-                            onToggle = { viewModel.setEnableSponsorsBlock(it) }
-                        )
-
-                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
-
-                        AdvancedSettingRow(
-                            title = "Extract Audio",
-                            subtitle = "Extract audio from downloaded videos",
-                            checked = extractAudio,
-                            onToggle = { scope.launch { qualityPrefs.setExtractAudio(it) } }
-                        )
-
-                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
-
-                        AdvancedSettingRow(
-                            title = "Keep Original Video",
-                            subtitle = "Keep video file after audio extraction",
-                            checked = keepVideoAfterAudioExtraction,
-                            enabled = extractAudio,
-                            onToggle = { scope.launch { qualityPrefs.setKeepVideoAfterAudioExtraction(it) } }
-                        )
-
-                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
-
-                        AdvancedSettingRow(
-                            title = "Use Cookies",
-                            subtitle = "Enable cookies for private/restricted content",
-                            checked = enableCookies,
-                            onToggle = { scope.launch { qualityPrefs.setEnableCookies(it) } }
-                        )
-                    }
+                    AdvancedSettingCard(
+                        title = "Download Playlist",
+                        subtitle = "Download full playlist if URL contains one",
+                        checked = downloadPlaylist,
+                        onToggle = { viewModel.setDownloadPlaylist(it) }
+                    )
+                    AdvancedSettingCard(
+                        title = "Download Archive",
+                        subtitle = "Only download videos not listed in archive file",
+                        checked = downloadArchive,
+                        onToggle = { viewModel.setDownloadArchive(it) }
+                    )
+                    AdvancedSettingCard(
+                        title = "SponsorBlock",
+                        subtitle = "Skip sponsored segments automatically",
+                        checked = enableSponsorsBlock,
+                        onToggle = { viewModel.setEnableSponsorsBlock(it) }
+                    )
+                    AdvancedSettingCard(
+                        title = "Extract Audio",
+                        subtitle = "Extract audio from downloaded videos",
+                        checked = extractAudio,
+                        onToggle = { scope.launch { qualityPrefs.setExtractAudio(it) } }
+                    )
+                    AdvancedSettingCard(
+                        title = "Keep Original Video",
+                        subtitle = "Keep video file after audio extraction",
+                        checked = keepVideoAfterAudioExtraction,
+                        enabled = extractAudio,
+                        onToggle = { scope.launch { qualityPrefs.setKeepVideoAfterAudioExtraction(it) } }
+                    )
+                    AdvancedSettingCard(
+                        title = "Use Cookies",
+                        subtitle = "Enable cookies for private/restricted content",
+                        checked = enableCookies,
+                        onToggle = { scope.launch { qualityPrefs.setEnableCookies(it) } }
+                    )
                 }
             }
 
             // Network & Reliability Section
             item {
-                Text(
-                    text = "Network & Reliability",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
-                )
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = "Network & Reliability",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
                     )
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(
+                                BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                                RoundedCornerShape(12.dp)
+                            ),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surface
+                        )
                     ) {
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 8.dp, horizontal = 4.dp)
+                                .padding(16.dp)
                         ) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Column {
+                                Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
                                     Text(
                                         "Download retries",
                                         style = MaterialTheme.typography.bodyLarge,
-                                        fontWeight = FontWeight.Medium
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurface
                                     )
+                                    Spacer(modifier = Modifier.height(4.dp))
                                     Text(
                                         "Maximum retry attempts on network failure",
                                         style = MaterialTheme.typography.bodySmall,
@@ -380,7 +265,7 @@ fun AdvancedSettingsScreen(
 }
 
 @Composable
-fun AdvancedSettingRow(
+private fun AdvancedSettingCard(
     title: String,
     subtitle: String,
     checked: Boolean,
@@ -388,32 +273,52 @@ fun AdvancedSettingRow(
     modifier: Modifier = Modifier,
     onToggle: (Boolean) -> Unit
 ) {
-    Row(
+    Card(
         modifier = modifier
             .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
             .then(if (enabled) Modifier.clickable { onToggle(!checked) } else Modifier)
             .alpha(if (enabled) 1f else 0.38f)
-            .padding(vertical = 12.dp, horizontal = 4.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+            .border(
+                BorderStroke(
+                    1.dp,
+                    if (checked && enabled) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                    else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                ),
+                RoundedCornerShape(12.dp)
+            ),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (checked && enabled) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f)
+            else MaterialTheme.colorScheme.surface
+        )
     ) {
-        Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Switch(
+                checked = checked,
+                onCheckedChange = onToggle,
+                enabled = enabled
             )
         }
-        Switch(
-            checked = checked,
-            onCheckedChange = onToggle,
-            enabled = enabled
-        )
     }
 }

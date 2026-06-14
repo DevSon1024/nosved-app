@@ -5,6 +5,8 @@ import android.net.Uri
 import android.os.Environment
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -17,6 +19,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -79,126 +83,79 @@ fun DirectorySettingsScreen(
         ) {
             // Folders Section
             item {
-                Text(
-                    text = "Folders",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
-                )
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = "Folders",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
                     )
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        // Video Folder Row
-                        DirectorySettingItem(
-                            title = "Video Folder",
-                            subtitle = videoFolder,
-                            onClick = { showVideoFolderDialog = true }
-                        )
-
-                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
-
-                        // Audio Folder Row
-                        DirectorySettingItem(
-                            title = "Audio Folder",
-                            subtitle = audioFolder,
-                            onClick = { showAudioFolderDialog = true }
-                        )
-                    }
+                    DirectorySettingCard(
+                        title = "Video Folder",
+                        subtitle = videoFolder,
+                        onClick = { showVideoFolderDialog = true }
+                    )
+                    DirectorySettingCard(
+                        title = "Audio Folder",
+                        subtitle = audioFolder,
+                        onClick = { showAudioFolderDialog = true }
+                    )
                 }
             }
 
             // Organization Section
             item {
-                Text(
-                    text = "Organization & Naming",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
-                )
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = "Organization & Naming",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
                     )
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        // Save to subdirectory Row
-                        val websiteStr = if (saveToSubdirWebsite) "Website" else ""
-                        val playlistStr = if (saveToSubdirPlaylist) "Playlist title" else ""
-                        val subdirSubtitle = when {
-                            saveToSubdirWebsite && saveToSubdirPlaylist -> "Website, Playlist title"
-                            saveToSubdirWebsite -> "Website"
-                            saveToSubdirPlaylist -> "Playlist title"
-                            else -> "None"
-                        }
-                        DirectorySettingItem(
-                            title = "Save to Subdirectory",
-                            subtitle = subdirSubtitle,
-                            onClick = { showSubdirDialog = true }
-                        )
-
-                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
-
-                        // Output template Row
-                        DirectorySettingItem(
-                            title = "Output Template",
-                            subtitle = outputTemplate,
-                            onClick = { showOutputTemplateDialog = true }
-                        )
-
-                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
-
-                        // Restrict Filenames Switch
-                        AdvancedSettingRow(
-                            title = "Restrict Filenames",
-                            subtitle = "Limit filenames to ASCII characters (removes emojis/spaces)",
-                            checked = restrictFilenames,
-                            onToggle = { viewModel.setRestrictFilenames(it) }
-                        )
+                    val websiteStr = if (saveToSubdirWebsite) "Website" else ""
+                    val playlistStr = if (saveToSubdirPlaylist) "Playlist title" else ""
+                    val subdirSubtitle = when {
+                        saveToSubdirWebsite && saveToSubdirPlaylist -> "Website, Playlist title"
+                        saveToSubdirWebsite -> "Website"
+                        saveToSubdirPlaylist -> "Playlist title"
+                        else -> "None"
                     }
+                    DirectorySettingCard(
+                        title = "Save to Subdirectory",
+                        subtitle = subdirSubtitle,
+                        onClick = { showSubdirDialog = true }
+                    )
+                    DirectorySettingCard(
+                        title = "Output Template",
+                        subtitle = outputTemplate,
+                        onClick = { showOutputTemplateDialog = true }
+                    )
+                    AdvancedSettingCard(
+                        title = "Restrict Filenames",
+                        subtitle = "Limit filenames to ASCII characters (removes emojis/spaces)",
+                        checked = restrictFilenames,
+                        onToggle = { viewModel.setRestrictFilenames(it) }
+                    )
                 }
             }
 
             // Maintenance Section
             item {
-                Text(
-                    text = "Maintenance",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
-                )
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = "Maintenance",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
                     )
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        DirectorySettingItem(
-                            title = "Clear temporary Files",
-                            subtitle = "Remove partial downloads to free up space",
-                            onClick = { showClearTempDialog = true }
-                        )
-                    }
+                    DirectorySettingCard(
+                        title = "Clear temporary Files",
+                        subtitle = "Remove partial downloads to free up space",
+                        onClick = { showClearTempDialog = true }
+                    )
                 }
             }
         }
@@ -258,19 +215,10 @@ fun DirectorySettingsScreen(
     if (showClearTempDialog) {
         AlertDialog(
             onDismissRequest = { showClearTempDialog = false },
-            icon = {
-                Icon(
-                    imageVector = Icons.Default.Delete,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.size(32.dp)
-                )
-            },
             title = {
                 Text(
                     text = "Clear Temporary Files",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Medium
+                    fontWeight = FontWeight.Bold
                 )
             },
             text = {
@@ -311,50 +259,124 @@ fun DirectorySettingsScreen(
                 }
             },
             shape = RoundedCornerShape(28.dp),
-            containerColor = MaterialTheme.colorScheme.surface,
-            tonalElevation = 6.dp
+            containerColor = MaterialTheme.colorScheme.surface
         )
     }
 }
 
 @Composable
-fun DirectorySettingItem(
+private fun DirectorySettingCard(
     title: String,
     subtitle: String,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    Row(
-        modifier = Modifier
+    Card(
+        modifier = modifier
             .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
             .clickable(onClick = onClick)
-            .padding(vertical = 12.dp, horizontal = 4.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+            .border(
+                BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                RoundedCornerShape(12.dp)
+            ),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
     ) {
-        Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Icon(
+                imageVector = Icons.Default.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp)
             )
         }
-        Icon(
-            imageVector = Icons.Default.ChevronRight,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(20.dp)
-        )
     }
 }
 
 @Composable
-fun CustomDirectoryDialog(
+private fun AdvancedSettingCard(
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    enabled: Boolean = true,
+    modifier: Modifier = Modifier,
+    onToggle: (Boolean) -> Unit
+) {
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .then(if (enabled) Modifier.clickable { onToggle(!checked) } else Modifier)
+            .alpha(if (enabled) 1f else 0.38f)
+            .border(
+                BorderStroke(
+                    1.dp,
+                    if (checked && enabled) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                    else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                ),
+                RoundedCornerShape(12.dp)
+            ),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (checked && enabled) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f)
+            else MaterialTheme.colorScheme.surface
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Switch(
+                checked = checked,
+                onCheckedChange = onToggle,
+                enabled = enabled
+            )
+        }
+    }
+}
+
+@Composable
+private fun CustomDirectoryDialog(
     title: String,
     description: String,
     currentPath: String,
@@ -379,19 +401,10 @@ fun CustomDirectoryDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        icon = {
-            Icon(
-                imageVector = Icons.Default.Folder,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(32.dp)
-            )
-        },
         title = {
             Text(
                 text = title,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Medium
+                fontWeight = FontWeight.Bold
             )
         },
         text = {
@@ -473,13 +486,12 @@ fun CustomDirectoryDialog(
             }
         },
         shape = RoundedCornerShape(28.dp),
-        containerColor = MaterialTheme.colorScheme.surface,
-        tonalElevation = 6.dp
+        containerColor = MaterialTheme.colorScheme.surface
     )
 }
 
 @Composable
-fun SubdirectorySelectionDialog(
+private fun SubdirectorySelectionDialog(
     initialWebsite: Boolean,
     initialPlaylist: Boolean,
     onDismiss: () -> Unit,
@@ -490,71 +502,81 @@ fun SubdirectorySelectionDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        icon = {
-            Icon(
-                imageVector = Icons.Default.FolderZip,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(32.dp)
-            )
-        },
         title = {
             Text(
                 text = "Save to subdirectory",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Medium
+                fontWeight = FontWeight.Bold
             )
         },
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(
                     text = "Save files in folders named as respective fields",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 8.dp)
                 )
-                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
 
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { websiteChecked = !websiteChecked }
-                        .padding(vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                // Website choice Card
+                Surface(
+                    onClick = { websiteChecked = !websiteChecked },
+                    shape = RoundedCornerShape(12.dp),
+                    color = if (websiteChecked) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                    border = if (websiteChecked) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Checkbox(
-                        checked = websiteChecked,
-                        onCheckedChange = { websiteChecked = it }
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Website",
-                        style = MaterialTheme.typography.bodyLarge
-                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "Website",
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = if (websiteChecked) FontWeight.Bold else FontWeight.Normal,
+                            color = if (websiteChecked) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                        )
+                        Checkbox(
+                            checked = websiteChecked,
+                            onCheckedChange = { websiteChecked = it }
+                        )
+                    }
                 }
 
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { playlistChecked = !playlistChecked }
-                        .padding(vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                // Playlist title choice Card
+                Surface(
+                    onClick = { playlistChecked = !playlistChecked },
+                    shape = RoundedCornerShape(12.dp),
+                    color = if (playlistChecked) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                    border = if (playlistChecked) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Checkbox(
-                        checked = playlistChecked,
-                        onCheckedChange = { playlistChecked = it }
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Playlist title",
-                        style = MaterialTheme.typography.bodyLarge
-                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "Playlist title",
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = if (playlistChecked) FontWeight.Bold else FontWeight.Normal,
+                            color = if (playlistChecked) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                        )
+                        Checkbox(
+                            checked = playlistChecked,
+                            onCheckedChange = { playlistChecked = it }
+                        )
+                    }
                 }
 
-                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
-
+                Spacer(modifier = Modifier.height(8.dp))
                 Column {
                     Text(
                         text = "Your downloads will be saved as:",
@@ -588,13 +610,12 @@ fun SubdirectorySelectionDialog(
             }
         },
         shape = RoundedCornerShape(28.dp),
-        containerColor = MaterialTheme.colorScheme.surface,
-        tonalElevation = 6.dp
+        containerColor = MaterialTheme.colorScheme.surface
     )
 }
 
 @Composable
-fun OutputTemplateSelectionDialog(
+private fun OutputTemplateSelectionDialog(
     currentTemplate: String,
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit
@@ -622,115 +643,126 @@ fun OutputTemplateSelectionDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        icon = {
-            Icon(
-                imageVector = Icons.Default.InsertDriveFile,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(32.dp)
-            )
-        },
         title = {
             Text(
                 text = "Output template",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Medium
+                fontWeight = FontWeight.Bold
             )
         },
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(
                     text = "Specify the template for output file names",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 8.dp)
                 )
-                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
 
                 // Option 1
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { selectedOption = 1 }
-                        .padding(vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                Surface(
+                    onClick = { selectedOption = 1 },
+                    shape = RoundedCornerShape(12.dp),
+                    color = if (selectedOption == 1) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                    border = if (selectedOption == 1) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    RadioButton(
-                        selected = selectedOption == 1,
-                        onClick = { selectedOption = 1 }
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = option1,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
-
-                // Option 2
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { selectedOption = 2 }
-                        .padding(vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    RadioButton(
-                        selected = selectedOption == 2,
-                        onClick = { selectedOption = 2 }
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = option2,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
-
-                // Option 3 (Custom)
-                Column(modifier = Modifier.fillMaxWidth()) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable { selectedOption = 3 }
-                            .padding(vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
+                        Text(
+                            text = option1,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = if (selectedOption == 1) FontWeight.Bold else FontWeight.Normal,
+                            color = if (selectedOption == 1) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                        )
+                        RadioButton(
+                            selected = selectedOption == 1,
+                            onClick = { selectedOption = 1 }
+                        )
+                    }
+                }
+
+                // Option 2
+                Surface(
+                    onClick = { selectedOption = 2 },
+                    shape = RoundedCornerShape(12.dp),
+                    color = if (selectedOption == 2) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                    border = if (selectedOption == 2) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = option2,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = if (selectedOption == 2) FontWeight.Bold else FontWeight.Normal,
+                            color = if (selectedOption == 2) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                        )
+                        RadioButton(
+                            selected = selectedOption == 2,
+                            onClick = { selectedOption = 2 }
+                        )
+                    }
+                }
+
+                // Option 3 (Custom)
+                Surface(
+                    onClick = { selectedOption = 3 },
+                    shape = RoundedCornerShape(12.dp),
+                    color = if (selectedOption == 3) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                    border = if (selectedOption == 3) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "Custom",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = if (selectedOption == 3) FontWeight.Bold else FontWeight.Normal,
+                            color = if (selectedOption == 3) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                        )
                         RadioButton(
                             selected = selectedOption == 3,
                             onClick = { selectedOption = 3 }
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Custom",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-
-                    if (selectedOption == 3) {
-                        OutlinedTextField(
-                            value = customText,
-                            onValueChange = { customText = it },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(start = 32.dp, top = 4.dp),
-                            placeholder = { Text(option2) },
-                            shape = RoundedCornerShape(12.dp)
-                        )
-                        Text(
-                            text = "Required: %(title).200B, .%(ext)s",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                            modifier = Modifier.padding(start = 36.dp, top = 4.dp)
-                        )
                     }
                 }
 
-                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+                if (selectedOption == 3) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    OutlinedTextField(
+                        value = customText,
+                        onValueChange = { customText = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text(option2) },
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    Text(
+                        text = "Required: %(title).200B, .%(ext)s",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        modifier = Modifier.padding(start = 4.dp, top = 2.dp)
+                    )
+                }
 
+                Spacer(modifier = Modifier.height(8.dp))
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -779,8 +811,7 @@ fun OutputTemplateSelectionDialog(
             }
         },
         shape = RoundedCornerShape(28.dp),
-        containerColor = MaterialTheme.colorScheme.surface,
-        tonalElevation = 6.dp
+        containerColor = MaterialTheme.colorScheme.surface
     )
 }
 
@@ -804,3 +835,5 @@ private fun getPathFromUri(context: Context, uri: Uri): String? {
     }
     return null
 }
+
+
