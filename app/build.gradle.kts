@@ -28,8 +28,8 @@ android {
         applicationId = "com.devson.nosved"
         minSdk = 24
         targetSdk = 36
-        versionCode = 103
-        versionName = "1.0.3"
+        versionCode = 104
+        versionName = "1.0.4"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true

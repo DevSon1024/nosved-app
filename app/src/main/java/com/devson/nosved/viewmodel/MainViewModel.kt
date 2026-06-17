@@ -228,10 +228,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun selectVideoFormat(format: VideoFormat) {
         _selectedVideoFormat.value = format
+        if (format.acodec != null && format.acodec != "none") {
+            _selectedAudioFormat.value = null
+        }
     }
 
     fun selectAudioFormat(format: VideoFormat) {
         _selectedAudioFormat.value = format
+        _selectedVideoFormat.value?.let { v ->
+            if (v.acodec != null && v.acodec != "none") {
+                _selectedVideoFormat.value = null
+            }
+        }
     }
 
     // --- Format Finding (for NEW downloads) ---
@@ -270,6 +278,32 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         return candidates.maxByOrNull { it.height ?: 0 }
     }
 
+    private fun findNearestMixedFormat(
+        formats: List<VideoFormat>,
+        preferredHeight: Int,
+        preferredContainer: String
+    ): VideoFormat? {
+        val candidates = formats.filter {
+            it.vcodec != "none" && it.vcodec != null &&
+                    it.acodec != "none" && it.acodec != null
+        }
+        val withContainer = candidates.filter {
+            preferredContainer.isEmpty() || it.ext.equals(preferredContainer, ignoreCase = true)
+        }
+        val searchList = if (withContainer.isNotEmpty()) withContainer else candidates
+
+        // Try to filter by height
+        val withHeight = searchList.filter { it.height != null }
+        if (withHeight.isNotEmpty()) {
+            val lowerOrEqual = withHeight.filter { (it.height ?: 0) <= preferredHeight }
+                .sortedByDescending { it.height }
+            if (lowerOrEqual.isNotEmpty()) return lowerOrEqual.first()
+            return withHeight.maxByOrNull { it.height ?: 0 }
+        }
+        
+        return searchList.firstOrNull()
+    }
+
     private fun parseQualityFromString(q: String): Int {
         return q.lowercase(Locale.ROOT)
             .replace("p", "")
@@ -301,8 +335,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
             when (downloadMode) {
                 DownloadMode.AUDIO_ONLY -> {
-                    val selectedAudio = findNearestAudioFormat(formats, targetAudioBitrate, preferredAudioContainer)
+                    var selectedAudio = findNearestAudioFormat(formats, targetAudioBitrate, preferredAudioContainer)
                         ?: findNearestAudioFormat(formats, targetAudioBitrate, "webm")
+
+                    if (selectedAudio == null) {
+                        selectedAudio = findNearestMixedFormat(formats, targetAudioBitrate, preferredAudioContainer)
+                            ?: findNearestMixedFormat(formats, targetAudioBitrate, "")
+                    }
+
+                    if (selectedAudio == null) {
+                        selectedAudio = formats.firstOrNull()
+                    }
 
                     if (selectedAudio != null) {
                         downloadService.startAudioDownload(
@@ -313,12 +356,28 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     } else showToast("No suitable audio format found.")
                 }
                 DownloadMode.VIDEO_AUDIO -> {
-                    val selectedVideo = findNearestVideoFormat(formats, targetVideoHeight, preferredVideoContainer)
+                    var selectedVideo = findNearestVideoFormat(formats, targetVideoHeight, preferredVideoContainer)
                         ?: findNearestVideoFormat(formats, targetVideoHeight, "webm")
-                    val selectedAudio = findNearestAudioFormat(formats, targetAudioBitrate, preferredAudioContainer)
+                    var selectedAudio = findNearestAudioFormat(formats, targetAudioBitrate, preferredAudioContainer)
                         ?: findNearestAudioFormat(formats, targetAudioBitrate, "webm")
 
-                    if (selectedVideo != null && selectedAudio != null) {
+                    if (selectedVideo == null || selectedAudio == null) {
+                        val mixedFormat = findNearestMixedFormat(formats, targetVideoHeight, preferredVideoContainer)
+                            ?: findNearestMixedFormat(formats, targetVideoHeight, "webm")
+                            ?: findNearestMixedFormat(formats, targetVideoHeight, "")
+                        if (mixedFormat != null) {
+                            selectedVideo = mixedFormat
+                            selectedAudio = null
+                        }
+                    }
+
+                    if (selectedVideo == null) {
+                        selectedVideo = formats.find { it.vcodec != "none" && it.vcodec != null }
+                            ?: formats.firstOrNull()
+                        selectedAudio = null
+                    }
+
+                    if (selectedVideo != null) {
                         downloadService.startVideoDownload(
                             url, videoInfo, selectedVideo, selectedAudio, customTitle, downloadSubtitles, subtitleLang
                         )
@@ -330,12 +389,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    @Deprecated("Use downloadVideoWithQuality")
-    fun downloadVideo(videoInfo: VideoInfo, videoFormat: VideoFormat, audioFormat: VideoFormat, customTitle: String) {
+    fun downloadVideo(videoInfo: VideoInfo, videoFormat: VideoFormat?, audioFormat: VideoFormat?, customTitle: String) {
         viewModelScope.launch (Dispatchers.IO) {
-            downloadService.startVideoDownload(
-                videoInfo.webpageUrl ?: "", videoInfo, videoFormat, audioFormat, customTitle, false, ""
-            )
+            val url = videoInfo.webpageUrl ?: ""
+            if (videoFormat != null) {
+                downloadService.startVideoDownload(
+                    url, videoInfo, videoFormat, audioFormat, customTitle, false, ""
+                )
+            } else if (audioFormat != null) {
+                downloadService.startAudioDownload(
+                    url, videoInfo, audioFormat, customTitle, false, ""
+                )
+            }
         }
     }
 

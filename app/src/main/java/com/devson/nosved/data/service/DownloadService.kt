@@ -79,13 +79,13 @@ class DownloadService(
         url: String,
         videoInfo: VideoInfo,
         videoFormat: VideoFormat,
-        audioFormat: VideoFormat,
+        audioFormat: VideoFormat?,
         customTitle: String,
         downloadSubtitles: Boolean,
         subtitleLang: String
     ) {
         val downloadId = UUID.randomUUID().toString()
-        val totalSize = (videoFormat.fileSize ?: 0L) + (audioFormat.fileSize ?: 0L)
+        val totalSize = (videoFormat.fileSize ?: 0L) + (audioFormat?.fileSize ?: 0L)
         val titleToUse = customTitle.ifBlank { videoInfo.title ?: "Unknown Title" }
         val sanitizedTitle = sanitizeTitle(titleToUse) // From DownloadUtils.kt
         val outputExtension = "mp4"
@@ -105,8 +105,8 @@ class DownloadService(
             status = DownloadStatus.QUEUED,
             duration = videoInfo.duration?.toString(),
             uploader = videoInfo.uploader,
-            videoFormat = "${videoFormat.height}p",
-            audioFormat = "${audioFormat.abr}kbps"
+            videoFormat = if (videoFormat.height != null && videoFormat.height!! > 0) "${videoFormat.height}p" else videoFormat.formatId ?: "best",
+            audioFormat = if (audioFormat != null) "${audioFormat.abr ?: audioFormat.tbr ?: 0}kbps" else if (videoFormat.acodec != null && videoFormat.acodec != "none") "Embedded" else "None"
         )
 
         repository.insertDownload(downloadEntity)
@@ -131,7 +131,7 @@ class DownloadService(
         downloadEntity: DownloadEntity,
         videoInfo: VideoInfo,
         videoFormat: VideoFormat,
-        audioFormat: VideoFormat,
+        audioFormat: VideoFormat?,
         sanitizedTitle: String,
         outputExtension: String,
         downloadSubtitles: Boolean,
@@ -200,7 +200,11 @@ class DownloadService(
                     "bestvideo[height<=$height]+bestaudio/best"
                 }
             } else {
-                "${videoFormat.formatId}+${audioFormat.formatId}/best"
+                if (audioFormat != null) {
+                    "${videoFormat.formatId}+${audioFormat.formatId}/best"
+                } else {
+                    videoFormat.formatId ?: "best"
+                }
             }
             request.addOption("-f", formatStr)
  
@@ -725,6 +729,32 @@ class DownloadService(
         return candidates.maxByOrNull { it.height ?: 0 }
     }
 
+    private fun findNearestMixedFormat(
+        formats: List<VideoFormat>,
+        preferredHeight: Int,
+        preferredContainer: String
+    ): VideoFormat? {
+        val candidates = formats.filter {
+            it.vcodec != "none" && it.vcodec != null &&
+                    it.acodec != "none" && it.acodec != null
+        }
+        val withContainer = candidates.filter {
+            preferredContainer.isEmpty() || it.ext.equals(preferredContainer, ignoreCase = true)
+        }
+        val searchList = if (withContainer.isNotEmpty()) withContainer else candidates
+
+        // Try to filter by height
+        val withHeight = searchList.filter { it.height != null }
+        if (withHeight.isNotEmpty()) {
+            val lowerOrEqual = withHeight.filter { (it.height ?: 0) <= preferredHeight }
+                .sortedByDescending { it.height }
+            if (lowerOrEqual.isNotEmpty()) return lowerOrEqual.first()
+            return withHeight.maxByOrNull { it.height ?: 0 }
+        }
+        
+        return searchList.firstOrNull()
+    }
+
     private fun parseQualityFromString(q: String?): Int {
         if (q == null) return 0
         return q.lowercase(Locale.ROOT)
@@ -807,31 +837,46 @@ class DownloadService(
                     false,
                     ""
                 )
- 
             } else {
                 val targetVideoHeight = parseQualityFromString(existingEntity.videoFormat)
                 val targetAudioBitrate = parseQualityFromString(existingEntity.audioFormat)
- 
-                val selectedVideo = findNearestVideoFormat(formats, targetVideoHeight, "mp4")
+
+                var selectedVideo = findNearestVideoFormat(formats, targetVideoHeight, "mp4")
                     ?: findNearestVideoFormat(formats, targetVideoHeight, "webm")
                     ?: formats.filter { it.vcodec != "none" && it.acodec == "none" }
                         .maxByOrNull { it.height ?: 0 }
- 
-                val selectedAudio = findNearestAudioFormat(formats, targetAudioBitrate, "m4a")
+
+                var selectedAudio = findNearestAudioFormat(formats, targetAudioBitrate, "m4a")
                     ?: findNearestAudioFormat(formats, targetAudioBitrate, "webm")
                     ?: formats.filter { it.acodec != "none" && it.vcodec == "none" }
                         .maxByOrNull { it.abr ?: 0 }
- 
-                if (selectedVideo == null || selectedAudio == null) throw Exception("Could not find suitable video/audio formats")
- 
-                val newTotalSize = (selectedVideo.fileSize ?: 0L) + (selectedAudio.fileSize ?: 0L)
+
+                if (selectedVideo == null || selectedAudio == null) {
+                    val mixedFormat = findNearestMixedFormat(formats, targetVideoHeight, "mp4")
+                        ?: findNearestMixedFormat(formats, targetVideoHeight, "webm")
+                        ?: findNearestMixedFormat(formats, targetVideoHeight, "")
+                    if (mixedFormat != null) {
+                        selectedVideo = mixedFormat
+                        selectedAudio = null
+                    }
+                }
+
+                if (selectedVideo == null) {
+                    selectedVideo = formats.find { it.vcodec != "none" && it.vcodec != null }
+                        ?: formats.firstOrNull()
+                    selectedAudio = null
+                }
+
+                if (selectedVideo == null) throw Exception("Could not find suitable video/audio formats")
+
+                val newTotalSize = (selectedVideo.fileSize ?: 0L) + (selectedAudio?.fileSize ?: 0L)
                 val updatedEntity = queuedEntity.copy(
                     fileSize = if (newTotalSize > 0) newTotalSize else 0L,
-                    videoFormat = "${selectedVideo.height}p",
-                    audioFormat = "${selectedAudio.abr}kbps"
+                    videoFormat = if (selectedVideo.height != null && selectedVideo.height!! > 0) "${selectedVideo.height}p" else selectedVideo.formatId ?: "best",
+                    audioFormat = if (selectedAudio != null) "${selectedAudio.abr ?: selectedAudio.tbr ?: 0}kbps" else if (selectedVideo.acodec != null && selectedVideo.acodec != "none") "Embedded" else "None"
                 )
                 repository.updateDownload(updatedEntity)
- 
+
                 // Defaulting to false for subtitles on redownload
                 executeVideoDownload(
                     updatedEntity,
@@ -954,15 +999,32 @@ class DownloadService(
             } else {
                 val targetVideoHeight = parseQualityFromString(existingEntity.videoFormat)
                 val targetAudioBitrate = parseQualityFromString(existingEntity.audioFormat)
-                val selectedVideo = findNearestVideoFormat(formats, targetVideoHeight, "mp4")
+                var selectedVideo = findNearestVideoFormat(formats, targetVideoHeight, "mp4")
                     ?: findNearestVideoFormat(formats, targetVideoHeight, "webm")
                     ?: formats.filter { it.vcodec != "none" && it.acodec == "none" }
                         .maxByOrNull { it.height ?: 0 }
-                val selectedAudio = findNearestAudioFormat(formats, targetAudioBitrate, "m4a")
+                var selectedAudio = findNearestAudioFormat(formats, targetAudioBitrate, "m4a")
                     ?: findNearestAudioFormat(formats, targetAudioBitrate, "webm")
                     ?: formats.filter { it.acodec != "none" && it.vcodec == "none" }
                         .maxByOrNull { it.abr ?: 0 }
-                if (selectedVideo == null || selectedAudio == null) throw Exception("Could not find suitable video/audio formats")
+
+                if (selectedVideo == null || selectedAudio == null) {
+                    val mixedFormat = findNearestMixedFormat(formats, targetVideoHeight, "mp4")
+                        ?: findNearestMixedFormat(formats, targetVideoHeight, "webm")
+                        ?: findNearestMixedFormat(formats, targetVideoHeight, "")
+                    if (mixedFormat != null) {
+                        selectedVideo = mixedFormat
+                        selectedAudio = null
+                    }
+                }
+
+                if (selectedVideo == null) {
+                    selectedVideo = formats.find { it.vcodec != "none" && it.vcodec != null }
+                        ?: formats.firstOrNull()
+                    selectedAudio = null
+                }
+
+                if (selectedVideo == null) throw Exception("Could not find suitable video/audio formats")
 
                 executeVideoDownload(
                     queuedEntity.copy(status = DownloadStatus.DOWNLOADING),

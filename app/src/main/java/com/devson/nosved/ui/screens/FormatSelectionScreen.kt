@@ -119,7 +119,7 @@ fun FormatSelectionScreen(
                         onClick = {
                             val v = selectedVideo
                             val a = selectedAudio
-                            if (v != null && a != null) {
+                            if (v != null || a != null) {
                                 viewModel.downloadVideo(info, v, a, customTitle)
                                 onNavigateBack()
                             }
