@@ -84,6 +84,30 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     val restrictFilenames: StateFlow<Boolean> = settingsRepo.restrictFilenamesFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
+    val limitSpeed: StateFlow<Boolean> = settingsRepo.limitSpeedFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    val maxSpeedKb: StateFlow<String> = settingsRepo.maxSpeedKbFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "1024")
+
+    val downloadUsingCellular: StateFlow<Boolean> = settingsRepo.downloadUsingCellularFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
+
+    val useAria2c: StateFlow<Boolean> = settingsRepo.useAria2cFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    val multiThreadedDownloadThreads: StateFlow<Int> = settingsRepo.multiThreadedDownloadThreadsFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 8)
+
+    val forceIpv4: StateFlow<Boolean> = settingsRepo.forceIpv4Flow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    val useProxy: StateFlow<Boolean> = settingsRepo.useProxyFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    val proxyUrl: StateFlow<String> = settingsRepo.proxyUrlFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
+
     fun setDarkTheme(isDark: Boolean) {
         viewModelScope.launch { settingsRepo.setDarkTheme(isDark) }
     }
@@ -174,6 +198,38 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     fun setRestrictFilenames(enabled: Boolean) {
         viewModelScope.launch { settingsRepo.setRestrictFilenames(enabled) }
+    }
+
+    fun setLimitSpeed(enabled: Boolean) {
+        viewModelScope.launch { settingsRepo.setLimitSpeed(enabled) }
+    }
+
+    fun setMaxSpeedKb(speed: String) {
+        viewModelScope.launch { settingsRepo.setMaxSpeedKb(speed) }
+    }
+
+    fun setDownloadUsingCellular(enabled: Boolean) {
+        viewModelScope.launch { settingsRepo.setDownloadUsingCellular(enabled) }
+    }
+
+    fun setUseAria2c(enabled: Boolean) {
+        viewModelScope.launch { settingsRepo.setUseAria2c(enabled) }
+    }
+
+    fun setMultiThreadedDownloadThreads(threads: Int) {
+        viewModelScope.launch { settingsRepo.setMultiThreadedDownloadThreads(threads) }
+    }
+
+    fun setForceIpv4(enabled: Boolean) {
+        viewModelScope.launch { settingsRepo.setForceIpv4(enabled) }
+    }
+
+    fun setUseProxy(enabled: Boolean) {
+        viewModelScope.launch { settingsRepo.setUseProxy(enabled) }
+    }
+
+    fun setProxyUrl(url: String) {
+        viewModelScope.launch { settingsRepo.setProxyUrl(url) }
     }
 
     override fun onCleared() {

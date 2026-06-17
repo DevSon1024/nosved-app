@@ -46,7 +46,6 @@ fun AdvancedSettingsScreen(
 
     val extractAudio by qualityPrefs.extractAudio.collectAsState(initial = false)
     val keepVideoAfterAudioExtraction by qualityPrefs.keepVideoAfterAudioExtraction.collectAsState(initial = false)
-    val enableCookies by qualityPrefs.enableCookies.collectAsState(initial = false)
     val maxDownloadRetries by qualityPrefs.maxDownloadRetries.collectAsState(initial = 3)
 
     Scaffold(
@@ -181,12 +180,6 @@ fun AdvancedSettingsScreen(
                         checked = keepVideoAfterAudioExtraction,
                         enabled = extractAudio,
                         onToggle = { scope.launch { qualityPrefs.setKeepVideoAfterAudioExtraction(it) } }
-                    )
-                    AdvancedSettingCard(
-                        title = "Use Cookies",
-                        subtitle = "Enable cookies for private/restricted content",
-                        checked = enableCookies,
-                        onToggle = { scope.launch { qualityPrefs.setEnableCookies(it) } }
                     )
                 }
             }

@@ -152,6 +152,7 @@ dependencies {
     // YouTubeDL Android - Same optimized version as Seal
     implementation("io.github.junkfood02.youtubedl-android:library:0.17.3")
     implementation("io.github.junkfood02.youtubedl-android:ffmpeg:0.17.3")
+    implementation("io.github.junkfood02.youtubedl-android:aria2c:0.17.3")
 
     // Core Android Components - Latest stable versions
     implementation("androidx.core:core-ktx:1.13.1")

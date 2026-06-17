@@ -45,7 +45,8 @@ fun SettingsScreen(
     onNavigateToAdvancedSettings: () -> Unit,
     onNavigateToAppVersion: () -> Unit,
     onNavigateToAppearanceSettings: () -> Unit,
-    onNavigateToDirectorySettings: () -> Unit
+    onNavigateToDirectorySettings: () -> Unit,
+    onNavigateToNetworkSettings: () -> Unit
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -121,6 +122,16 @@ fun SettingsScreen(
                             title = "Format Settings",
                             subtitle = "Set default mode, formats, and quality",
                             onClick = onNavigateToQualitySettings
+                        )
+                        HorizontalDivider(
+                            modifier = Modifier.padding(start = 72.dp),
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                        )
+                        SettingsItemRow(
+                            icon = Icons.Default.Wifi,
+                            title = "Network Settings",
+                            subtitle = "Rate limit, cellular, and download threads",
+                            onClick = onNavigateToNetworkSettings
                         )
                         HorizontalDivider(
                             modifier = Modifier.padding(start = 72.dp),

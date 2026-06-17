@@ -5,6 +5,7 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -21,7 +22,9 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.VideoFile
 import androidx.compose.material.icons.filled.HighQuality
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.sp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -222,33 +225,17 @@ fun QualitySettingsScreen(
                         subtitle = "Languages, embed subtitles, auto captions",
                         onClick = { onNavigateToSubtitleSettings() }
                     )
-                    FormatSettingCard(
+                    ClickableSwitchFormatSettingCard(
                         title = "Format sorting",
                         subtitle = "Sorting formats with the -S option of yt-dlp",
+                        checked = formatSorting,
                         onClick = {
                             if (formatSorting) {
                                 tempSortingInput = sortingFields
                                 showSortingDialog = true
                             }
                         },
-                        trailingContent = {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                if (formatSorting) {
-                                    TextButton(
-                                        onClick = {
-                                            tempSortingInput = sortingFields
-                                            showSortingDialog = true
-                                        }
-                                    ) {
-                                        Text("Configure")
-                                    }
-                                }
-                                Switch(
-                                    checked = formatSorting,
-                                    onCheckedChange = { viewModel.setFormatSorting(it) }
-                                )
-                            }
-                        }
+                        onToggle = { viewModel.setFormatSorting(it) }
                     )
                     FormatSettingCard(
                         title = "Format selection",
@@ -911,6 +898,121 @@ private fun FormatSettingCard(
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun ClickableSwitchFormatSettingCard(
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    enabled: Boolean = true,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+    onToggle: (Boolean) -> Unit
+) {
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .alpha(if (enabled) 1f else 0.38f)
+            .border(
+                BorderStroke(
+                    1.dp,
+                    if (checked && enabled) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                    else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                ),
+                RoundedCornerShape(12.dp)
+            ),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (checked && enabled) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f)
+            else MaterialTheme.colorScheme.surface
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(
+                        if (enabled) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.15f)
+                    )
+                    .clickable(enabled = enabled) { onClick() }
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = title,
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.24f))
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Edit,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(10.dp),
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                                Text(
+                                    text = "TAP TO SETUP",
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontSize = 8.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        letterSpacing = 0.5.sp
+                                    ),
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            Box(
+                modifier = Modifier
+                    .height(32.dp)
+                    .width(1.dp)
+                    .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+            )
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            Switch(
+                checked = checked,
+                onCheckedChange = onToggle,
+                enabled = enabled
+            )
         }
     }
 }

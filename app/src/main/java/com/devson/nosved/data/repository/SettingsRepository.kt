@@ -96,6 +96,30 @@ class SettingsRepository(context: Context) {
     private val _restrictFilenamesFlow = MutableStateFlow(prefs.getBoolean("restrict_filenames", false))
     val restrictFilenamesFlow: StateFlow<Boolean> = _restrictFilenamesFlow.asStateFlow()
 
+    private val _limitSpeedFlow = MutableStateFlow(prefs.getBoolean("limit_speed", false))
+    val limitSpeedFlow: StateFlow<Boolean> = _limitSpeedFlow.asStateFlow()
+
+    private val _maxSpeedKbFlow = MutableStateFlow(prefs.getString("max_speed_kb", "1024") ?: "1024")
+    val maxSpeedKbFlow: StateFlow<String> = _maxSpeedKbFlow.asStateFlow()
+
+    private val _downloadUsingCellularFlow = MutableStateFlow(prefs.getBoolean("download_using_cellular", true))
+    val downloadUsingCellularFlow: StateFlow<Boolean> = _downloadUsingCellularFlow.asStateFlow()
+
+    private val _useAria2cFlow = MutableStateFlow(prefs.getBoolean("use_aria2c", false))
+    val useAria2cFlow: StateFlow<Boolean> = _useAria2cFlow.asStateFlow()
+
+    private val _multiThreadedDownloadThreadsFlow = MutableStateFlow(prefs.getInt("multi_threaded_download_threads", 8))
+    val multiThreadedDownloadThreadsFlow: StateFlow<Int> = _multiThreadedDownloadThreadsFlow.asStateFlow()
+
+    private val _forceIpv4Flow = MutableStateFlow(prefs.getBoolean("force_ipv4", false))
+    val forceIpv4Flow: StateFlow<Boolean> = _forceIpv4Flow.asStateFlow()
+
+    private val _useProxyFlow = MutableStateFlow(prefs.getBoolean("use_proxy", false))
+    val useProxyFlow: StateFlow<Boolean> = _useProxyFlow.asStateFlow()
+
+    private val _proxyUrlFlow = MutableStateFlow(prefs.getString("proxy_url", "") ?: "")
+    val proxyUrlFlow: StateFlow<String> = _proxyUrlFlow.asStateFlow()
+
     private val preferenceChangeListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         when (key) {
             "is_dark_theme" -> {
@@ -167,6 +191,30 @@ class SettingsRepository(context: Context) {
             }
             "restrict_filenames" -> {
                 _restrictFilenamesFlow.value = prefs.getBoolean("restrict_filenames", false)
+            }
+            "limit_speed" -> {
+                _limitSpeedFlow.value = prefs.getBoolean("limit_speed", false)
+            }
+            "max_speed_kb" -> {
+                _maxSpeedKbFlow.value = prefs.getString("max_speed_kb", "1024") ?: "1024"
+            }
+            "download_using_cellular" -> {
+                _downloadUsingCellularFlow.value = prefs.getBoolean("download_using_cellular", true)
+            }
+            "use_aria2c" -> {
+                _useAria2cFlow.value = prefs.getBoolean("use_aria2c", false)
+            }
+            "multi_threaded_download_threads" -> {
+                _multiThreadedDownloadThreadsFlow.value = prefs.getInt("multi_threaded_download_threads", 8)
+            }
+            "force_ipv4" -> {
+                _forceIpv4Flow.value = prefs.getBoolean("force_ipv4", false)
+            }
+            "use_proxy" -> {
+                _useProxyFlow.value = prefs.getBoolean("use_proxy", false)
+            }
+            "proxy_url" -> {
+                _proxyUrlFlow.value = prefs.getString("proxy_url", "") ?: ""
             }
         }
     }
@@ -278,5 +326,37 @@ class SettingsRepository(context: Context) {
 
     fun setRestrictFilenames(enabled: Boolean) {
         prefs.edit().putBoolean("restrict_filenames", enabled).apply()
+    }
+
+    fun setLimitSpeed(enabled: Boolean) {
+        prefs.edit().putBoolean("limit_speed", enabled).apply()
+    }
+
+    fun setMaxSpeedKb(speed: String) {
+        prefs.edit().putString("max_speed_kb", speed).apply()
+    }
+
+    fun setDownloadUsingCellular(enabled: Boolean) {
+        prefs.edit().putBoolean("download_using_cellular", enabled).apply()
+    }
+
+    fun setUseAria2c(enabled: Boolean) {
+        prefs.edit().putBoolean("use_aria2c", enabled).apply()
+    }
+
+    fun setMultiThreadedDownloadThreads(threads: Int) {
+        prefs.edit().putInt("multi_threaded_download_threads", threads).apply()
+    }
+
+    fun setForceIpv4(enabled: Boolean) {
+        prefs.edit().putBoolean("force_ipv4", enabled).apply()
+    }
+
+    fun setUseProxy(enabled: Boolean) {
+        prefs.edit().putBoolean("use_proxy", enabled).apply()
+    }
+
+    fun setProxyUrl(url: String) {
+        prefs.edit().putString("proxy_url", url).apply()
     }
 }

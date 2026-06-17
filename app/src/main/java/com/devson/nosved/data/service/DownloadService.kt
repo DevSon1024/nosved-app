@@ -167,8 +167,20 @@ class DownloadService(
  
         val restrictFilenames = prefs.getBoolean("restrict_filenames", false)
         val template = prefs.getString("output_template", "%(title).200B.%(ext)s") ?: "%(title).200B.%(ext)s"
+
+        val limitSpeed = prefs.getBoolean("limit_speed", false)
+        val maxSpeedKb = prefs.getString("max_speed_kb", "1024") ?: "1024"
+        val useAria2c = prefs.getBoolean("use_aria2c", false)
+        val multiThreadedDownloadThreads = prefs.getInt("multi_threaded_download_threads", 8)
+        val forceIpv4 = prefs.getBoolean("force_ipv4", false)
+        val useProxy = prefs.getBoolean("use_proxy", false)
+        val proxyUrl = prefs.getString("proxy_url", "") ?: ""
+        val enableCookies = qualityPrefs.enableCookies.first()
  
         try {
+            if (!isNetworkAvailableForDownload(context)) {
+                throw Exception("Downloads are disabled on cellular networks.")
+            }
             if (repository.getDownloadById(downloadId)?.status != DownloadStatus.DOWNLOADING) {
                 repository.updateDownloadStatus(downloadId, DownloadStatus.DOWNLOADING)
             }
@@ -188,6 +200,29 @@ class DownloadService(
  
             if (restrictFilenames) {
                 request.addOption("--restrict-filenames")
+            }
+
+            if (limitSpeed) {
+                request.addOption("-r", "${maxSpeedKb}K")
+            }
+            if (forceIpv4) {
+                request.addOption("-4")
+            }
+            if (useAria2c) {
+                request.addOption("--downloader", "libaria2c.so")
+            } else if (multiThreadedDownloadThreads > 1) {
+                request.addOption("--concurrent-fragments", multiThreadedDownloadThreads)
+            }
+
+            if (useProxy && proxyUrl.isNotEmpty()) {
+                request.addOption("--proxy", proxyUrl)
+            }
+
+            if (enableCookies) {
+                val cookiesFile = File(context.filesDir, "cookies.txt")
+                if (cookiesFile.exists() && cookiesFile.length() > 0) {
+                    request.addOption("--cookies", cookiesFile.absolutePath)
+                }
             }
  
             val isPlaylist = isPlaylistUrl(downloadEntity.url)
@@ -490,8 +525,20 @@ class DownloadService(
  
         val restrictFilenames = prefs.getBoolean("restrict_filenames", false)
         val template = prefs.getString("output_template", "%(title).200B.%(ext)s") ?: "%(title).200B.%(ext)s"
+
+        val limitSpeed = prefs.getBoolean("limit_speed", false)
+        val maxSpeedKb = prefs.getString("max_speed_kb", "1024") ?: "1024"
+        val useAria2c = prefs.getBoolean("use_aria2c", false)
+        val multiThreadedDownloadThreads = prefs.getInt("multi_threaded_download_threads", 8)
+        val forceIpv4 = prefs.getBoolean("force_ipv4", false)
+        val useProxy = prefs.getBoolean("use_proxy", false)
+        val proxyUrl = prefs.getString("proxy_url", "") ?: ""
+        val enableCookies = qualityPrefs.enableCookies.first()
  
         try {
+            if (!isNetworkAvailableForDownload(context)) {
+                throw Exception("Downloads are disabled on cellular networks.")
+            }
             if (repository.getDownloadById(downloadId)?.status != DownloadStatus.DOWNLOADING) {
                 repository.updateDownloadStatus(downloadId, DownloadStatus.DOWNLOADING)
             }
@@ -511,6 +558,29 @@ class DownloadService(
  
             if (restrictFilenames) {
                 request.addOption("--restrict-filenames")
+            }
+
+            if (limitSpeed) {
+                request.addOption("-r", "${maxSpeedKb}K")
+            }
+            if (forceIpv4) {
+                request.addOption("-4")
+            }
+            if (useAria2c) {
+                request.addOption("--downloader", "libaria2c.so")
+            } else if (multiThreadedDownloadThreads > 1) {
+                request.addOption("--concurrent-fragments", multiThreadedDownloadThreads)
+            }
+
+            if (useProxy && proxyUrl.isNotEmpty()) {
+                request.addOption("--proxy", proxyUrl)
+            }
+
+            if (enableCookies) {
+                val cookiesFile = File(context.filesDir, "cookies.txt")
+                if (cookiesFile.exists() && cookiesFile.length() > 0) {
+                    request.addOption("--cookies", cookiesFile.absolutePath)
+                }
             }
  
             val isPlaylist = isPlaylistUrl(downloadEntity.url)
@@ -1230,4 +1300,13 @@ class DownloadService(
             else -> null
         }
     }
+}
+
+private fun isNetworkAvailableForDownload(context: Context): Boolean {
+    val prefs = context.getSharedPreferences("app_settings", Context.MODE_PRIVATE)
+    val downloadUsingCellular = prefs.getBoolean("download_using_cellular", true)
+    if (downloadUsingCellular) return true
+
+    val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager
+    return cm == null || !cm.isActiveNetworkMetered
 }
