@@ -460,6 +460,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun deleteDownloadsBulk(downloadIds: List<String>) {
+        viewModelScope.launch {
+            downloadService.deleteDownloadsBulk(downloadIds)
+        }
+    }
+
+    fun removeFromAppBulk(downloadIds: List<String>) {
+        viewModelScope.launch {
+            downloadService.removeFromAppBulk(downloadIds)
+        }
+    }
+
     // --- Clipboard & URL Utils ---
 
     fun pasteUrlOnly(): String {

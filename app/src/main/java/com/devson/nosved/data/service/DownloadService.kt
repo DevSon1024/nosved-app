@@ -1098,6 +1098,37 @@ class DownloadService(
         download?.title?.let { showToast("Download deleted: $it") }
     }
 
+    suspend fun deleteDownloadsBulk(downloadIds: List<String>) = withContext(Dispatchers.IO) {
+        var deletedCount = 0
+        downloadIds.forEach { id ->
+            val download = repository.getDownloadById(id)
+            download?.filePath?.let {
+                try {
+                    val oldFile = File(it)
+                    if (oldFile.exists()) {
+                        oldFile.delete()
+                    }
+                } catch (_: Exception) {}
+            }
+            repository.deleteDownload(id)
+            deletedCount++
+        }
+        if (deletedCount > 0) {
+            showToast("Deleted $deletedCount Videos From Downloads")
+        }
+    }
+
+    suspend fun removeFromAppBulk(downloadIds: List<String>) = withContext(Dispatchers.IO) {
+        var removedCount = 0
+        downloadIds.forEach { id ->
+            repository.deleteDownload(id)
+            removedCount++
+        }
+        if (removedCount > 0) {
+            showToast("Deleted $removedCount Videos From Downloads")
+        }
+    }
+
     private fun showToast(message: String) {
         coroutineScope.launch(Dispatchers.Main) {
             Toast.makeText(context, message, Toast.LENGTH_SHORT).show()

@@ -265,7 +265,8 @@ fun DownloadsScreen(
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
                         containerColor = MaterialTheme.colorScheme.background,
-                        titleContentColor = MaterialTheme.colorScheme.primary,
+                        titleContentColor = MaterialTheme.colorScheme.onBackground,
+                        navigationIconContentColor = MaterialTheme.colorScheme.onBackground,
                         actionIconContentColor = MaterialTheme.colorScheme.onBackground
                     )
                 )
@@ -383,11 +384,19 @@ fun DownloadsScreen(
                     onClick = {
                         val deleteFiles = deleteDialogCheckboxState
                         
-                        idsToDelete.forEach { id ->
+                        if (idsToDelete.size > 1) {
                             if (deleteFiles) {
-                                viewModel.deleteDownload(id)
+                                viewModel.deleteDownloadsBulk(idsToDelete.toList())
                             } else {
-                                viewModel.removeFromApp(id)
+                                viewModel.removeFromAppBulk(idsToDelete.toList())
+                            }
+                        } else {
+                            idsToDelete.firstOrNull()?.let { id ->
+                                if (deleteFiles) {
+                                    viewModel.deleteDownload(id)
+                                } else {
+                                    viewModel.removeFromApp(id)
+                                }
                             }
                         }
                         
