@@ -12,6 +12,7 @@
         tools:ignore="ScopedStorage" />
 
     <application
+        android:name=".NosvedApp"
         android:extractNativeLibs="true"
         android:requestLegacyExternalStorage="true"
         android:allowBackup="true"

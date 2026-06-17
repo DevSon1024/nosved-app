@@ -21,10 +21,6 @@ import com.devson.nosved.ui.navigation.MainContent
 import com.devson.nosved.ui.theme.NosvedPlayerTheme
 import com.devson.nosved.viewmodel.MainViewModel
 import com.devson.nosved.viewmodel.SettingsViewModel
-import com.yausername.ffmpeg.FFmpeg
-import com.yausername.youtubedl_android.YoutubeDL
-import com.yausername.youtubedl_android.YoutubeDLException
-
 class MainActivity : ComponentActivity() {
 
     private val viewModel: MainViewModel by viewModels()
@@ -37,7 +33,6 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        initializeDownloader()
         askNotificationPermission()
 
         setContent {
@@ -62,15 +57,6 @@ class MainActivity : ComponentActivity() {
                     MainContent(viewModel)
                 }
             }
-        }
-    }
-
-    private fun initializeDownloader() {
-        try {
-            YoutubeDL.getInstance().init(this)
-            FFmpeg.getInstance().init(this)
-        } catch (e: YoutubeDLException) {
-            Log.e("NosvedApp", "Failed to initialize youtubedl-android", e)
         }
     }
 
