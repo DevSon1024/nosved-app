@@ -1,8 +1,11 @@
 package com.devson.nosved.data.service
 
 import android.content.Context
+import android.media.MediaScannerConnection
 import android.os.Environment
+import android.util.Log
 import android.widget.Toast
+import com.devson.nosved.download.MimeTypeUtil
 import com.devson.nosved.util.NotificationHelper
 import com.devson.nosved.data.DownloadEntity
 import com.devson.nosved.data.DownloadProgress
@@ -51,6 +54,26 @@ class DownloadService(
 
     // Helper to generate a stable, unique integer ID for notifications
     private fun getNotificationId(downloadId: String): Int = abs(downloadId.hashCode())
+
+    /**
+     * Triggers Android MediaScannerConnection to index the completed file into MediaStore immediately.
+     */
+    private fun scanMediaFile(filePath: String, isAudioOnly: Boolean) {
+        try {
+            val file = File(filePath)
+            if (!file.exists()) return
+            val mimeType = MimeTypeUtil.getMimeType(filePath, isAudioOnly)
+            MediaScannerConnection.scanFile(
+                context,
+                arrayOf(file.absolutePath),
+                arrayOf(mimeType)
+            ) { path, uri ->
+                Log.d("MediaScanner", "Scanned $path: -> uri=$uri")
+            }
+        } catch (e: Exception) {
+            Log.e("MediaScanner", "Failed to scan media file: $filePath", e)
+        }
+    }
 
     /**
      * Helper to parse the yt-dlp output line for the current task.
@@ -392,6 +415,7 @@ class DownloadService(
                     error = null
                 )
             )
+            scanMediaFile(resolvedFilePath.absolutePath, isAudioOnly = false)
             showToast("Download completed: ${downloadEntity.title}")
             if (isNotificationEnabled) {
                 notificationHelper.showDownloadCompleteNotification(
@@ -721,6 +745,7 @@ class DownloadService(
                     error = null
                 )
             )
+            scanMediaFile(resolvedFilePath.absolutePath, isAudioOnly = true)
             showToast("Audio download completed: ${downloadEntity.title}")
             if (isNotificationEnabled) {
                 notificationHelper.showDownloadCompleteNotification(
