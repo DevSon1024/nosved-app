@@ -73,10 +73,6 @@ Contributions are welcome! Please feel free to submit pull requests or open issu
 - Thanks to the yt-dlp community for their excellent video downloading tool
 - Thanks to all contributors and open-source developers whose work made this project possible
 
-## Contact
-
-For questions, issues, or suggestions, please open an issue on this repository.
-
 ---
 
 **Note**: This project is not affiliated with or endorsed by the Seal project or JunkFood02. It is an independent application inspired by Seal's approach to Android video downloading.
