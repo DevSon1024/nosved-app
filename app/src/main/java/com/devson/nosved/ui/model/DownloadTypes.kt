@@ -1,10 +1,12 @@
-// app/src/main/java/com/devson/nosved/ui/model/DownloadTypes.kt
 package com.devson.nosved.ui.model
+
+import androidx.compose.runtime.Immutable
 
 enum class DownloadTabType {
     ALL, ACTIVE, COMPLETED, FAILED
 }
 
+@Immutable
 data class DownloadCounts(
     val all: Int = 0,
     val active: Int = 0,
@@ -12,6 +14,7 @@ data class DownloadCounts(
     val failed: Int = 0
 )
 
+@Immutable
 sealed class DownloadAction {
     data class Play(val filePath: String) : DownloadAction()
     data class Share(val filePath: String) : DownloadAction()

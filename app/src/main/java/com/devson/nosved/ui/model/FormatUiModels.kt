@@ -1,7 +1,9 @@
 package com.devson.nosved.ui.model
 
+import androidx.compose.runtime.Immutable
 import com.yausername.youtubedl_android.mapper.VideoFormat
 
+@Immutable
 data class SuggestedPair(
     val video: VideoFormat,
     val audio: VideoFormat,

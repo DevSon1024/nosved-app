@@ -7,15 +7,16 @@ import com.yausername.youtubedl_android.mapper.VideoInfo
 import kotlinx.coroutines.*
 import kotlinx.serialization.json.Json
 import java.net.URI
+import java.util.concurrent.ConcurrentHashMap
 
 object VideoInfoUtil {
 
     private const val TAG = "VideoInfoUtil"
     private val jsonFormat = Json { ignoreUnknownKeys = true }
 
-    // Enhanced caching with expiry
-    private val infoCache = mutableMapOf<String, CachedVideoInfo>()
-    private val activeJobs = mutableMapOf<String, Job>()  // Fixed: was mutableMapMap
+    // Enhanced thread-safe caching with expiry
+    private val infoCache = ConcurrentHashMap<String, CachedVideoInfo>()
+    private val activeJobs = ConcurrentHashMap<String, Job>()
     private val platformOptimizations = initializePlatformSettings()
 
     data class CachedVideoInfo(
@@ -161,7 +162,10 @@ object VideoInfoUtil {
     private fun detectPlatform(url: String): PlatformConfig {
         return platformOptimizations.entries.find { (domain, _) ->
             url.contains(domain, ignoreCase = true)
-        }?.value ?: platformOptimizations["generic"]!!
+        }?.value ?: platformOptimizations["generic"] ?: PlatformConfig(
+            timeout = 8000,
+            extraOptions = listOf("--format", "best[height<=720]", "--no-check-certificate")
+        )
     }
 
     private suspend fun extractWithOptimizedSettings(url: String, config: PlatformConfig): VideoInfo {

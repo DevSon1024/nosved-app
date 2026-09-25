@@ -1,9 +1,11 @@
 package com.devson.nosved.ui
 
+import androidx.compose.runtime.Immutable
 import com.devson.nosved.ui.model.SuggestedPair
 import com.devson.nosved.ui.model.heightLabel
 import com.yausername.youtubedl_android.mapper.VideoFormat
 
+@Immutable
 data class FormatGroups(
     val audioOnly: List<VideoFormat>,
     val videoOnly: List<VideoFormat>,

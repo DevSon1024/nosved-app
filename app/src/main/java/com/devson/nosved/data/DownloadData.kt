@@ -1,8 +1,10 @@
 package com.devson.nosved.data
 
+import androidx.compose.runtime.Immutable
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
+@Immutable
 @Entity(tableName = "downloads")
 data class DownloadEntity(
     @PrimaryKey val id: String,
@@ -33,6 +35,7 @@ enum class DownloadStatus {
     CANCELLED
 }
 
+@Immutable
 data class DownloadProgress(
     val id: String,
     val progress: Int = 0,

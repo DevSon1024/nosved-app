@@ -38,11 +38,12 @@ fun DownloadActions(
             // Context-aware menu items based on download status
             when (download.status) {
                 DownloadStatus.COMPLETED -> {
-                    if (!download.filePath.isNullOrEmpty()) {
+                    val path = download.filePath
+                    if (!path.isNullOrEmpty()) {
                         DropdownMenuItem(
                             text = { Text("Play") },
                             onClick = {
-                                onAction(DownloadAction.Play(download.filePath!!))
+                                onAction(DownloadAction.Play(path))
                                 showMenu = false
                             },
                             leadingIcon = {
@@ -52,7 +53,7 @@ fun DownloadActions(
                         DropdownMenuItem(
                             text = { Text("Share") },
                             onClick = {
-                                onAction(DownloadAction.Share(download.filePath!!))
+                                onAction(DownloadAction.Share(path))
                                 showMenu = false
                             },
                             leadingIcon = {

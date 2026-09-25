@@ -152,11 +152,11 @@ fun AnimatedProgressCard(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                if (!download.videoFormat.isNullOrEmpty()) {
-                    AnimatedChip(text = download.videoFormat!!)
+                download.videoFormat?.takeIf { it.isNotEmpty() }?.let { format ->
+                    AnimatedChip(text = format)
                 }
-                if (!download.audioFormat.isNullOrEmpty()) {
-                    AnimatedChip(text = download.audioFormat!!)
+                download.audioFormat?.takeIf { it.isNotEmpty() }?.let { format ->
+                    AnimatedChip(text = format)
                 }
             }
         }

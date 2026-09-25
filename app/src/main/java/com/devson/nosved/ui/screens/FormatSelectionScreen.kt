@@ -309,7 +309,10 @@ fun FormatSelectionScreen(
             //  Suggested Section 
             if (groups.suggested.isNotEmpty()) {
                 item { FssSectionTitle("Suggested") }
-                items(groups.suggested) { s ->
+                items(
+                    items = groups.suggested,
+                    key = { "${it.video.formatId}_${it.audio.formatId}_${it.label}" }
+                ) { s ->
                     FssSuggestedTile(
                         pair = s,
                         isSelected = selectedVideo?.formatId == s.video.formatId &&
@@ -326,7 +329,10 @@ fun FormatSelectionScreen(
             if (groups.audioOnly.isNotEmpty()) {
                 item { FssSectionTitle("Audio") }
                 val audioChunks = groups.audioOnly.chunked(2)
-                items(audioChunks) { chunk ->
+                items(
+                    items = audioChunks,
+                    key = { chunk -> chunk.joinToString("-") { it.formatId ?: it.format ?: it.hashCode().toString() } }
+                ) { chunk ->
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -372,7 +378,10 @@ fun FormatSelectionScreen(
                     }
                 }
                 val videoList = if (showAllVideos) groups.videoOnly else groups.videoOnly.take(4)
-                items(videoList.chunked(2)) { chunk ->
+                items(
+                    items = videoList.chunked(2),
+                    key = { chunk -> chunk.joinToString("-") { it.formatId ?: it.format ?: it.hashCode().toString() } }
+                ) { chunk ->
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -396,7 +405,10 @@ fun FormatSelectionScreen(
             //  Mixed (Video + Audio) Section 
             if (groups.mixed.isNotEmpty()) {
                 item { FssSectionTitle("Video") }
-                items(groups.mixed.chunked(2)) { chunk ->
+                items(
+                    items = groups.mixed.chunked(2),
+                    key = { chunk -> chunk.joinToString("-") { it.formatId ?: it.format ?: it.hashCode().toString() } }
+                ) { chunk ->
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()

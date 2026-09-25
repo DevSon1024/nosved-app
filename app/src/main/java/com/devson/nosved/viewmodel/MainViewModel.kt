@@ -64,7 +64,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val settingsRepository = SettingsRepository(application)
     private val ytDlpUpdater = YtDlpUpdater(application)
 
-    private val downloadService = DownloadService(
+    private val downloadService = DownloadService.getOrCreate(
         context,
         downloadRepository,
         notificationHelper,
@@ -85,12 +85,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     init {
         notificationHelper.createNotificationChannel()
 
-        // Run update check on init
-        viewModelScope.launch {
+        // Run update check and clear cache asynchronously on IO
+        viewModelScope.launch(Dispatchers.IO) {
             ytDlpUpdater.checkAndUpdate()
+            clearYoutubeDLCache()
         }
-
-        clearYoutubeDLCache()
     }
 
     // --- YT-DLP Updater Functions for UI ---

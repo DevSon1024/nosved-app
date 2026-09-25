@@ -4,6 +4,7 @@ import com.devson.nosved.data.DownloadDao
 import com.devson.nosved.data.DownloadEntity
 import com.devson.nosved.data.DownloadStatus
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import java.io.File
 
 /**
@@ -11,15 +12,19 @@ import java.io.File
  */
 class DownloadRepository(private val downloadDao: DownloadDao) {
 
-    // Flows observed by the ViewModel
+    // Single source of truth flow from Room, avoiding multiple SQLite observers
     val allDownloads: Flow<List<DownloadEntity>> = downloadDao.getAllDownloads()
-    val runningDownloads: Flow<List<DownloadEntity>> = downloadDao.getDownloadsByStatus(
-        DownloadStatus.DOWNLOADING)
-    val completedDownloads: Flow<List<DownloadEntity>> = downloadDao.getDownloadsByStatus(
-        DownloadStatus.COMPLETED)
-    val failedDownloads: Flow<List<DownloadEntity>> = downloadDao.getDownloadsByStatuses(
-        listOf(DownloadStatus.FAILED, DownloadStatus.CANCELLED)
-    )
+
+    // Derived in-memory flows with zero SQLite contention
+    val runningDownloads: Flow<List<DownloadEntity>> = allDownloads.map { list ->
+        list.filter { it.status == DownloadStatus.DOWNLOADING || it.status == DownloadStatus.QUEUED }
+    }
+    val completedDownloads: Flow<List<DownloadEntity>> = allDownloads.map { list ->
+        list.filter { it.status == DownloadStatus.COMPLETED }
+    }
+    val failedDownloads: Flow<List<DownloadEntity>> = allDownloads.map { list ->
+        list.filter { it.status == DownloadStatus.FAILED || it.status == DownloadStatus.CANCELLED }
+    }
 
     suspend fun getDownloadById(id: String): DownloadEntity? {
         return downloadDao.getDownloadById(id)

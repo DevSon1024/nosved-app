@@ -73,13 +73,16 @@ fun DownloadItemCard(
                             onToggleSelection()
                         } else {
                             if (isPlayable) {
-                                val file = File(download.filePath!!)
-                                if (file.exists()) {
-                                    onAction(DownloadAction.Play(download.filePath!!))
-                                } else {
-                                    dialogTitle = "File Not Found"
-                                    dialogMessage = "The downloaded file has been deleted or moved from your device storage."
-                                    showOptionsDialog = true
+                                val path = download.filePath
+                                if (path != null) {
+                                    val file = File(path)
+                                    if (file.exists()) {
+                                        onAction(DownloadAction.Play(path))
+                                    } else {
+                                        dialogTitle = "File Not Found"
+                                        dialogMessage = "The downloaded file has been deleted or moved from your device storage."
+                                        showOptionsDialog = true
+                                    }
                                 }
                             } else if (download.status == DownloadStatus.DOWNLOADING || download.status == DownloadStatus.QUEUED) {
                                 onAction(DownloadAction.Pause(download.id))

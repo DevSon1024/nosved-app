@@ -28,19 +28,15 @@ android {
         applicationId = "com.devson.nosved"
         minSdk = 24
         targetSdk = 36
-        versionCode = 104
-        versionName = "1.0.4"
+        versionCode = 105
+        versionName = "1.0.5"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
         }
 
-        // Conditional ABI configuration
-        if (!splitApks) {
-            // For debug builds - only include device ABI for faster builds
-            ndk {
-                abiFilters.add("arm64-v8a")
-            }
+        ndk {
+            abiFilters.addAll(listOf("arm64-v8a"))
         }
     }
 
@@ -77,24 +73,17 @@ android {
         }
     }
 
-    // Conditional splits configuration
-    if (splitApks) {
-        splits {
-            abi {
-                isEnable = true
-                reset()
-                include("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
-                isUniversalApk = false
-            }
+    splits {
+        abi {
+            isEnable = false
         }
     }
 
     applicationVariants.all {
         val variant = this
         variant.outputs.all {
-            val outputImpl = this as com.android.build.gradle.internal.api.BaseVariantOutputImpl
-            val abiName = outputImpl.filters.find { it.filterType == "ABI" }?.identifier ?: "universal"
-            outputFileName = "Nosved-v${variant.versionName}-${abiName}.apk"
+            (this as com.android.build.gradle.internal.api.BaseVariantOutputImpl).outputFileName =
+                "Nosved-v${variant.versionName}-arm64-v8a.apk"
         }
     }
 
@@ -188,8 +177,9 @@ dependencies {
     // Image Loading - Essential only (like Seal)
     implementation("io.coil-kt:coil-compose:2.7.0")
 
-    // Performance monitoring
+    // Performance monitoring & Baseline Profile AOT execution
     implementation("androidx.compose.runtime:runtime-tracing:1.0.0-beta01")
+    implementation("androidx.profileinstaller:profileinstaller:1.4.1")
 
     // Date/Time - Lightweight
     implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.1")
@@ -215,6 +205,10 @@ dependencies {
     // Debug tools - Only for debug builds
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
+}
+
+composeCompiler {
+    stabilityConfigurationFile.set(rootProject.file("compose_stability.conf"))
 }
 
 // Optimize builds like Seal

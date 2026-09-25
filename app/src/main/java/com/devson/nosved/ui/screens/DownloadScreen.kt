@@ -294,7 +294,7 @@ fun DownloadsScreen(
                         .padding(horizontal = 16.dp, vertical = 6.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(domainsList) { domain ->
+                    items(domainsList, key = { it }) { domain ->
                         FilterChip(
                             selected = selectedDomainFilter == domain,
                             onClick = { selectedDomainFilter = domain },
@@ -574,7 +574,8 @@ private fun DownloadList(
     ) {
         items(
             items = downloads,
-            key = { it.id }
+            key = { it.id },
+            contentType = { "download_item" }
         ) { download ->
             DownloadItemCard(
                 download = download,

@@ -42,7 +42,10 @@ fun DownloadTabRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        items(tabs) { (tabType, titleAndCount) ->
+        items(
+            items = tabs,
+            key = { it.first.name }
+        ) { (tabType, titleAndCount) ->
             val (title, count) = titleAndCount
             val isSelected = selectedTab == tabType
 

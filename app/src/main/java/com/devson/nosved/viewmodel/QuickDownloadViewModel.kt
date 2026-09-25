@@ -60,7 +60,7 @@ class QuickDownloadViewModel(application: Application) : AndroidViewModel(applic
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private val downloadService by lazy {
-        DownloadService(
+        DownloadService.getOrCreate(
             context = ctx,
             repository = repository,
             notificationHelper = notificationHelper,
